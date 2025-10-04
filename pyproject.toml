@@ -1,0 +1,17 @@
+[project]
+name = "lab-spark-cluster"
+version = "0.1.0"
+description = "Step-by-step guide for setting up a 3-node Apache Spark cluster on AWS EC2"
+requires-python = ">=3.10"
+dependencies = [
+    "awscli>=1.42.35",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
