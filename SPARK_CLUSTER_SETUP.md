@@ -498,13 +498,13 @@ Before we configure the nodes, let's copy the necessary lab files and IP address
 Copy the lab files and IP addresses to the master node:
 
 ```bash
-scp -i spark-cluster-key.pem -r cluster-files ubuntu@$MASTER_PUBLIC_IP:~/lab-spark-on-ec2
-scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 ```
 
 **Verify the files were copied:**
 ```bash
-ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP "ls -la ~/spark-cluster/ && cat ~/spark-cluster/cluster-ips.txt"
 ```
 
 You should see the lab files and IP addresses listed.
@@ -512,25 +512,25 @@ You should see the lab files and IP addresses listed.
 ### Step 5.2: Copy Files to Worker 1
 
 ```bash
-scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER1_PUBLIC_IP:~/lab-spark-on-ec2
-scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER1_PUBLIC_IP:~/
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER1_PUBLIC_IP:~/spark-cluster/
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER1_PUBLIC_IP:~/spark-cluster/
 ```
 
 **Verify the files were copied:**
 ```bash
-ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP "ls -la ~/spark-cluster/ && cat ~/spark-cluster/cluster-ips.txt"
 ```
 
 ### Step 5.3: Copy Files to Worker 2
 
 ```bash
-scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER2_PUBLIC_IP:~/lab-spark-on-ec2
-scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER2_PUBLIC_IP:~/
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER2_PUBLIC_IP:~/spark-cluster/
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER2_PUBLIC_IP:~/spark-cluster/
 ```
 
 **Verify the files were copied:**
 ```bash
-ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP "ls -la ~/spark-cluster/ && cat ~/spark-cluster/cluster-ips.txt"
 ```
 
 All three nodes now have the lab files and IP addresses ready!
@@ -584,7 +584,7 @@ uv --version
 ### Step 6.4: Install Python Dependencies with uv
 
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv sync
 ```
 
@@ -617,8 +617,8 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
-echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
-echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -634,7 +634,7 @@ You should see the paths printed and the start-master.sh script should exist.
 ### Step 6.7: Verify Installation
 
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv run python spark_installation_test.py
 ```
 
@@ -674,8 +674,8 @@ cat > $SPARK_HOME/conf/spark-env.sh <<EOF
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export SPARK_MASTER_HOST=$MASTER_PRIVATE_IP
 export SPARK_MASTER_PORT=7077
-export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
-export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
+export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
 EOF
 
 chmod +x $SPARK_HOME/conf/spark-env.sh
@@ -773,7 +773,7 @@ uv --version
 ### Step 7.3: Install Python Dependencies
 
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv sync
 ```
 
@@ -794,8 +794,8 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
-echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
-echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -806,8 +806,8 @@ Create the Spark environment file:
 ```bash
 cat > $SPARK_HOME/conf/spark-env.sh <<EOF
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
-export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
+export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
 EOF
 
 chmod +x $SPARK_HOME/conf/spark-env.sh
@@ -871,7 +871,7 @@ uv --version
 ### Step 8.3: Install Python Dependencies
 
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv sync
 ```
 
@@ -892,8 +892,8 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
-echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
-echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -904,8 +904,8 @@ Create the Spark environment file:
 ```bash
 cat > $SPARK_HOME/conf/spark-env.sh <<EOF
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
-export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
+export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python
 EOF
 
 chmod +x $SPARK_HOME/conf/spark-env.sh
@@ -1100,7 +1100,7 @@ If you don't see 2 workers, see the Troubleshooting section below.
 
 Still on master node:
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv run python spark_installation_test.py
 ```
 
@@ -1128,7 +1128,7 @@ First, copy the cluster version script from your EC2 instance:
 ```bash
 # From your EC2 instance (where you have cluster-files/)
 source cluster-ips.txt
-scp -i spark-cluster-key.pem cluster-files/nyc_tlc_problem1_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/lab-spark-on-ec2/
+scp -i spark-cluster-key.pem cluster-files/nyc_tlc_problem1_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 ```
 
 Then on the master node, run the cluster version:
@@ -1149,7 +1149,7 @@ $SPARK_HOME/sbin/start-all.sh
 sleep 5
 
 # Run the cluster version (reads from S3, distributes work across all nodes)
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv run python nyc_tlc_problem1_cluster.py spark://$MASTER_PRIVATE_IP:7077 2>&1 | tee problem1_cluster.txt
 ```
 
@@ -1372,7 +1372,7 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 
 Verify Python environment:
 ```bash
-cd ~/lab-spark-on-ec2
+cd ~/spark-cluster
 uv run python --version  # Should be 3.10+
 uv run python -c "import pyspark; print(pyspark.__version__)"  # Should be 4.x
 ```
