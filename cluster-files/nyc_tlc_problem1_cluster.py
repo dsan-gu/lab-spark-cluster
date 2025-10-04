@@ -253,8 +253,8 @@ def main():
     logger.info("Initializing Spark session for cluster execution")
     spark = create_spark_session(master_url)
 
-    # Get S3 paths for 6 months of data (January to June 2021)
-    months_to_download = [1, 2, 3, 4, 5, 6]
+    # Get S3 paths for 12 months of data (full year 2021)
+    months_to_download = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     logger.info(f"Preparing S3 paths for {len(months_to_download)} months of data: {months_to_download}")
     data_files = get_s3_paths(months_to_download)
 
