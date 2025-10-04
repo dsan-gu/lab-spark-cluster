@@ -440,6 +440,57 @@ cat cluster-ips.txt
 
 You should see all 6 IP addresses listed.
 
+### Step 4.7: Save Cluster Configuration (IDs and IPs)
+
+Save all important resource IDs and IPs to a file for later use (cleanup, management, etc.):
+
+```bash
+cat > cluster-config.txt <<EOF
+# Cluster Configuration - Created $(date)
+AWS_REGION=$AWS_REGION
+SPARK_SG_ID=$SPARK_SG_ID
+
+# Instance IDs
+MASTER_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-master" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text \
+  --region $AWS_REGION)
+
+WORKER1_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text \
+  --region $AWS_REGION)
+
+WORKER2_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[1].InstanceId' \
+  --output text \
+  --region $AWS_REGION)
+
+# IP Addresses
+MASTER_PUBLIC_IP=$MASTER_PUBLIC_IP
+MASTER_PRIVATE_IP=$MASTER_PRIVATE_IP
+WORKER1_PUBLIC_IP=$WORKER1_PUBLIC_IP
+WORKER1_PRIVATE_IP=$WORKER1_PRIVATE_IP
+WORKER2_PUBLIC_IP=$WORKER2_PUBLIC_IP
+WORKER2_PRIVATE_IP=$WORKER2_PRIVATE_IP
+EOF
+
+# Export instance IDs for current session
+export MASTER_INSTANCE_ID=$(grep MASTER_INSTANCE_ID cluster-config.txt | cut -d= -f2)
+export WORKER1_INSTANCE_ID=$(grep WORKER1_INSTANCE_ID cluster-config.txt | cut -d= -f2)
+export WORKER2_INSTANCE_ID=$(grep WORKER2_INSTANCE_ID cluster-config.txt | cut -d= -f2)
+```
+
+**Verify the configuration file:**
+```bash
+cat cluster-config.txt
+```
+
+You should see all resource IDs and IP addresses. **Keep this file safe** - you'll need it to manage and clean up your cluster later.
+
 ---
 
 ## Part 5: Copy Lab Files and IP Addresses to All Nodes
@@ -1176,9 +1227,58 @@ spark-submit \
 
 ## Part 14: Cleanup (When Done)
 
+### Load Cluster Configuration
+
+First, load your saved cluster configuration:
+
+```bash
+# Load all the resource IDs and settings
+source cluster-config.txt
+
+# Verify variables are set
+echo "Region: $AWS_REGION"
+echo "Security Group: $SPARK_SG_ID"
+echo "Master Instance: $MASTER_INSTANCE_ID"
+echo "Worker 1 Instance: $WORKER1_INSTANCE_ID"
+echo "Worker 2 Instance: $WORKER2_INSTANCE_ID"
+```
+
+If you don't have the `cluster-config.txt` file, you can still find resources by tags (see alternative method below).
+
 ### Terminate EC2 Instances
 
-From your EC2 instance:
+**Option 1: Using saved configuration (recommended)**
+
+Check which instances will be terminated:
+```bash
+aws ec2 describe-instances \
+  --instance-ids $MASTER_INSTANCE_ID $WORKER1_INSTANCE_ID $WORKER2_INSTANCE_ID \
+  --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' \
+  --output table \
+  --region $AWS_REGION
+```
+
+Terminate them:
+```bash
+aws ec2 terminate-instances \
+  --instance-ids $MASTER_INSTANCE_ID $WORKER1_INSTANCE_ID $WORKER2_INSTANCE_ID \
+  --region $AWS_REGION
+```
+
+**Option 2: Find by tags (if you don't have cluster-config.txt)**
+
+Check which instances will be terminated:
+```bash
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-master,spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' \
+  --output table \
+  --region $AWS_REGION
+```
+
+You should see your 3 instances (1 master + 2 workers) in "running" state.
+
+Terminate them:
 ```bash
 aws ec2 terminate-instances \
   --instance-ids $(aws ec2 describe-instances \
@@ -1188,6 +1288,17 @@ aws ec2 terminate-instances \
     --region $AWS_REGION) \
   --region $AWS_REGION
 ```
+
+**Verify termination started:**
+```bash
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-master,spark-worker" \
+  --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' \
+  --output table \
+  --region $AWS_REGION
+```
+
+You should now see instances in "shutting-down" or "terminated" state.
 
 ### Delete Security Group
 

@@ -42,6 +42,7 @@ aws/
 *.pem
 spark-cluster-key.pem
 cluster-ips.txt
+cluster-config.txt
 
 # Temporary and output files
 *.log
