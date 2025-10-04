@@ -658,7 +658,7 @@ You should see all tests pass with green checkmarks.
 Load the IP addresses from the cluster-ips.txt file we copied earlier:
 
 ```bash
-source ~/cluster-ips.txt
+source ~/spark-cluster/cluster-ips.txt
 ```
 
 Verify all IPs are loaded:
@@ -705,7 +705,7 @@ Load the cluster IPs and create the workers configuration file:
 
 ```bash
 # Load the cluster IPs
-source ~/cluster-ips.txt
+source ~/spark-cluster/cluster-ips.txt
 
 # Verify IPs are loaded
 echo "Master: $MASTER_PRIVATE_IP"
@@ -1156,7 +1156,7 @@ Then on the master node, run the cluster version:
 
 ```bash
 # Load the cluster IPs
-source ~/cluster-ips.txt
+source ~/spark-cluster/cluster-ips.txt
 
 # Verify the master IP is set
 echo "Spark Master URL: spark://$MASTER_PRIVATE_IP:7077"
