@@ -617,9 +617,9 @@ mv spark-4.0.1-bin-hadoop3 spark
 rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
 ```
 
-### Step 6.6: Configure Environment Variables
+### Step 6.6: Configure Environment Variables and Custom Prompt
 
-Set up the required environment variables:
+Set up the required environment variables and customize the prompt to show "MASTER":
 
 ```bash
 echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
@@ -628,6 +628,10 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
 echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+
+# Customize prompt to show MASTER
+echo 'export PS1="[MASTER] \u@\h:\w\$ "' >> ~/.bashrc
+
 source ~/.bashrc
 ```
 
@@ -796,7 +800,7 @@ mv spark-4.0.1-bin-hadoop3 spark
 rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
 ```
 
-### Step 7.5: Configure Environment Variables
+### Step 7.5: Configure Environment Variables and Custom Prompt
 
 ```bash
 echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
@@ -805,6 +809,10 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
 echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+
+# Customize prompt to show WORKER-1
+echo 'export PS1="[WORKER-1] \u@\h:\w\$ "' >> ~/.bashrc
+
 source ~/.bashrc
 ```
 
@@ -894,7 +902,7 @@ mv spark-4.0.1-bin-hadoop3 spark
 rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
 ```
 
-### Step 8.5: Configure Environment Variables
+### Step 8.5: Configure Environment Variables and Custom Prompt
 
 ```bash
 echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
@@ -903,6 +911,10 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
 echo 'export PYSPARK_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
 echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/spark-cluster/.venv/bin/python' >> ~/.bashrc
+
+# Customize prompt to show WORKER-2
+echo 'export PS1="[WORKER-2] \u@\h:\w\$ "' >> ~/.bashrc
+
 source ~/.bashrc
 ```
 
