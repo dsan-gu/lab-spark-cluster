@@ -44,20 +44,9 @@ sudo ./aws/install
 aws --version
 ```
 
-### Step 1.2: Configure AWS CLI
+### Step 1.2: Set Your Region as Environment Variable
 
-Run the configuration command:
-```bash
-aws configure
-```
-
-You will be prompted to enter:
-- AWS Access Key ID: `[Your Access Key]`
-- AWS Secret Access Key: `[Your Secret Key]`
-- Default region name: `us-east-1` (or your preferred region)
-- Default output format: `json`
-
-### Step 1.3: Set Your Region as Environment Variable
+Since you're running on an EC2 instance with an IAM role, AWS credentials are automatically provided. You only need to set the region:
 
 ```bash
 export AWS_REGION=us-east-1
@@ -96,60 +85,23 @@ Look for `spark-cluster-sg` in the output - this is the security group we just c
 
 ### Step 2.2: Configure Security Group Rules
 
-**Allow SSH access (port 22) from your IP:**
+**Get IP addresses for access control:**
 
-First, get your current public IP:
-```bash
-export MY_IP=$(curl -s https://checkip.amazonaws.com)
-echo "My Public IP: $MY_IP"
-```
-
-**IMPORTANT:** This IP should match your laptop/workstation's public IP. You can verify this by visiting https://ipchicken.com/ from your laptop. If the IPs don't match, use the IP from ipchicken.com instead:
+We need two IP addresses:
+1. **This EC2 instance IP** - for SSH access to cluster nodes from this management instance
+2. **Your laptop IP** - for SSH and Web UI access from your laptop
 
 ```bash
-export MY_IP=[your IP from ipchicken.com]
+# Get this EC2 instance's public IP
+export MY_EC2_IP=$(curl -s https://checkip.amazonaws.com)
+echo "My EC2 Instance IP: $MY_EC2_IP"
+
+# Get your laptop IP from ipchicken.com and set it manually
+export MY_LAPTOP_IP=[your IP from ipchicken.com]
+echo "My Laptop IP: $MY_LAPTOP_IP"
 ```
 
-Now allow SSH from your IP:
-```bash
-aws ec2 authorize-security-group-ingress \
-  --group-id $SPARK_SG_ID \
-  --protocol tcp \
-  --port 22 \
-  --cidr ${MY_IP}/32 \
-  --region $AWS_REGION
-```
-
-**Expected output:**
-```json
-{
-    "Return": true,
-    "SecurityGroupRules": [
-        {
-            "SecurityGroupRuleId": "sgr-xxxxx...",
-            "GroupId": "sg-xxxxx...",
-            "IsEgress": false,
-            "IpProtocol": "tcp",
-            "FromPort": 22,
-            "ToPort": 22,
-            "CidrIpv4": "YOUR.IP.ADDRESS/32"
-        }
-    ]
-}
-```
-
-Look for `"FromPort": 22` and `"ToPort": 22` with your IP address in `CidrIpv4` - this confirms SSH access is allowed!
-
-**Verify the rule was added:**
-```bash
-aws ec2 describe-security-groups \
-  --group-ids $SPARK_SG_ID \
-  --region $AWS_REGION \
-  --query 'SecurityGroups[0].IpPermissions' \
-  --output table
-```
-
-You should see a rule allowing TCP port 22 from your IP address.
+**IMPORTANT:** Visit https://ipchicken.com/ from your laptop to get your laptop's public IP address.
 
 **Allow all traffic within the security group (for cluster communication):**
 ```bash
@@ -160,26 +112,63 @@ aws ec2 authorize-security-group-ingress \
   --region $AWS_REGION
 ```
 
-**Allow Spark Web UI access (port 8080 for Master, 8081 for Workers):**
+**Allow SSH access (port 22) from both EC2 instance and laptop:**
+```bash
+# Allow SSH from this EC2 instance
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 22 \
+  --cidr ${MY_EC2_IP}/32 \
+  --region $AWS_REGION
 
-**SECURITY NOTE:** This rule allows access to the Spark Web UI **only from your IP address**. This ensures only you can view the cluster dashboard, not anyone on the internet. Make sure the `$MY_IP` variable matches your laptop's IP from https://ipchicken.com/.
+# Allow SSH from your laptop
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 22 \
+  --cidr ${MY_LAPTOP_IP}/32 \
+  --region $AWS_REGION
+```
+
+**Allow Spark Web UI access (ports 8080, 8081) from both EC2 instance and laptop:**
+
+**SECURITY NOTE:** These rules restrict access to **only your EC2 instance and laptop IP addresses** (not the entire internet).
 
 ```bash
+# Allow Spark Master UI (8080) and Worker UI (8081) from EC2 instance
 aws ec2 authorize-security-group-ingress \
   --group-id $SPARK_SG_ID \
   --protocol tcp \
   --port 8080-8081 \
-  --cidr ${MY_IP}/32 \
+  --cidr ${MY_EC2_IP}/32 \
+  --region $AWS_REGION
+
+# Allow Spark Master UI (8080) and Worker UI (8081) from laptop
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 8080-8081 \
+  --cidr ${MY_LAPTOP_IP}/32 \
   --region $AWS_REGION
 ```
 
-**Allow Spark application UI (port 4040):**
+**Allow Spark Application UI (port 4040) from both EC2 instance and laptop:**
 ```bash
+# Allow Spark Application UI from EC2 instance
 aws ec2 authorize-security-group-ingress \
   --group-id $SPARK_SG_ID \
   --protocol tcp \
   --port 4040 \
-  --cidr ${MY_IP}/32 \
+  --cidr ${MY_EC2_IP}/32 \
+  --region $AWS_REGION
+
+# Allow Spark Application UI from laptop
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 4040 \
+  --cidr ${MY_LAPTOP_IP}/32 \
   --region $AWS_REGION
 ```
 
@@ -416,7 +405,14 @@ echo "Worker 1: $WORKER1_PUBLIC_IP (public) / $WORKER1_PRIVATE_IP (private)"
 echo "Worker 2: $WORKER2_PUBLIC_IP (public) / $WORKER2_PRIVATE_IP (private)"
 ```
 
-Make sure all 6 IP addresses are displayed correctly before proceeding!
+**Expected output:**
+```
+Master: 44.204.89.174 (public) / 172.31.93.156 (private)
+Worker 1: 54.86.212.214 (public) / 172.31.89.92 (private)
+Worker 2: 54.161.66.220 (public) / 172.31.87.206 (private)
+```
+
+Make sure all 6 IP addresses are displayed correctly (your IPs will be different) before proceeding!
 
 ### Step 4.6: Save IP Addresses to File
 
@@ -1054,17 +1050,33 @@ This Web UI is accessible **only from your IP address** that you configured in S
 
 **If you can't access the Web UI:**
 
-1. **Check your current IP:** Visit https://ipchicken.com/ from your laptop
+1. **Check your current laptop IP:** Visit https://ipchicken.com/ from your laptop
 2. **Verify it matches:** Make sure it's the same IP you used in Step 2.2 (`$MY_IP`)
-3. **If your IP changed:** You'll need to update the security group rule:
+3. **If your laptop IP changed:** You'll need to add a new security group rule for the new IP:
 
 ```bash
 # From your EC2 instance where you ran the setup
-export NEW_IP=[your current IP from ipchicken.com]
+export NEW_IP=[your new laptop IP from ipchicken.com]
+
+# Add rules for the new IP
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 22 \
+  --cidr ${NEW_IP}/32 \
+  --region $AWS_REGION
+
 aws ec2 authorize-security-group-ingress \
   --group-id $SPARK_SG_ID \
   --protocol tcp \
   --port 8080-8081 \
+  --cidr ${NEW_IP}/32 \
+  --region $AWS_REGION
+
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 4040 \
   --cidr ${NEW_IP}/32 \
   --region $AWS_REGION
 ```
