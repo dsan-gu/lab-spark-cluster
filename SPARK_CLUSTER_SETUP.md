@@ -495,9 +495,10 @@ Before we configure the nodes, let's copy the necessary lab files and IP address
 
 ### Step 5.1: Copy Files to Master Node
 
-Copy the lab files and IP addresses to the master node:
+First, create the spark-cluster directory on the master node, then copy the files:
 
 ```bash
+ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP "mkdir -p ~/spark-cluster"
 scp -i spark-cluster-key.pem -r cluster-files ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 ```
@@ -512,6 +513,7 @@ You should see the lab files and IP addresses listed.
 ### Step 5.2: Copy Files to Worker 1
 
 ```bash
+ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP "mkdir -p ~/spark-cluster"
 scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER1_PUBLIC_IP:~/spark-cluster/
 scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER1_PUBLIC_IP:~/spark-cluster/
 ```
@@ -524,6 +526,7 @@ ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP "ls -la ~/spark-cluster/ 
 ### Step 5.3: Copy Files to Worker 2
 
 ```bash
+ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP "mkdir -p ~/spark-cluster"
 scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER2_PUBLIC_IP:~/spark-cluster/
 scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER2_PUBLIC_IP:~/spark-cluster/
 ```
