@@ -503,6 +503,12 @@ scp -i spark-cluster-key.pem -r cluster-files ubuntu@$MASTER_PUBLIC_IP:~/spark-c
 scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 ```
 
+**Note:** The first time you connect to each node, you'll be asked:
+```
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+Type `yes` and press Enter.
+
 **Verify the files were copied:**
 ```bash
 ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP "ls -la ~/spark-cluster/ && cat ~/spark-cluster/cluster-ips.txt"
