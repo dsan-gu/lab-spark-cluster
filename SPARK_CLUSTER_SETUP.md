@@ -27,6 +27,12 @@ Each node will have:
 
 ### Step 1.1: Install AWS CLI (if not already installed)
 
+First, install unzip if not already installed:
+```bash
+sudo apt install unzip -y
+```
+
+Then download and install AWS CLI:
 ```bash
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
@@ -64,26 +70,48 @@ echo "export AWS_REGION=us-east-1" >> ~/.bashrc
 
 ### Step 2.1: Create a Security Group
 
-Create a security group for the Spark cluster:
+Create a security group for the Spark cluster and automatically save the ID:
 ```bash
-aws ec2 create-security-group \
+export SPARK_SG_ID=$(aws ec2 create-security-group \
   --group-name spark-cluster-sg \
   --description "Security group for Spark cluster" \
-  --region $AWS_REGION
+  --region $AWS_REGION \
+  --query 'GroupId' \
+  --output text)
+
+echo "Security Group ID: $SPARK_SG_ID"
 ```
 
-Save the Security Group ID from the output (format: `sg-xxxxxxxxx`):
+The Security Group ID will be automatically captured and displayed.
+
+**Verify the security group was created:**
 ```bash
-export SPARK_SG_ID=sg-xxxxxxxxx
+aws ec2 describe-security-groups \
+  --region $AWS_REGION \
+  --query 'SecurityGroups[*].[GroupName,GroupId,Description]' \
+  --output table
 ```
 
-Replace `sg-xxxxxxxxx` with the actual Security Group ID from the output above.
+Look for `spark-cluster-sg` in the output - this is the security group we just created!
 
 ### Step 2.2: Configure Security Group Rules
 
 **Allow SSH access (port 22) from your IP:**
+
+First, get your current public IP:
 ```bash
-MY_IP=$(curl -s https://checkip.amazonaws.com)
+export MY_IP=$(curl -s https://checkip.amazonaws.com)
+echo "My Public IP: $MY_IP"
+```
+
+**IMPORTANT:** This IP should match your laptop/workstation's public IP. You can verify this by visiting https://ipchicken.com/ from your laptop. If the IPs don't match, use the IP from ipchicken.com instead:
+
+```bash
+export MY_IP=[your IP from ipchicken.com]
+```
+
+Now allow SSH from your IP:
+```bash
 aws ec2 authorize-security-group-ingress \
   --group-id $SPARK_SG_ID \
   --protocol tcp \
@@ -91,6 +119,37 @@ aws ec2 authorize-security-group-ingress \
   --cidr ${MY_IP}/32 \
   --region $AWS_REGION
 ```
+
+**Expected output:**
+```json
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-xxxxx...",
+            "GroupId": "sg-xxxxx...",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIpv4": "YOUR.IP.ADDRESS/32"
+        }
+    ]
+}
+```
+
+Look for `"FromPort": 22` and `"ToPort": 22` with your IP address in `CidrIpv4` - this confirms SSH access is allowed!
+
+**Verify the rule was added:**
+```bash
+aws ec2 describe-security-groups \
+  --group-ids $SPARK_SG_ID \
+  --region $AWS_REGION \
+  --query 'SecurityGroups[0].IpPermissions' \
+  --output table
+```
+
+You should see a rule allowing TCP port 22 from your IP address.
 
 **Allow all traffic within the security group (for cluster communication):**
 ```bash
@@ -102,6 +161,9 @@ aws ec2 authorize-security-group-ingress \
 ```
 
 **Allow Spark Web UI access (port 8080 for Master, 8081 for Workers):**
+
+**SECURITY NOTE:** This rule allows access to the Spark Web UI **only from your IP address**. This ensures only you can view the cluster dashboard, not anyone on the internet. Make sure the `$MY_IP` variable matches your laptop's IP from https://ipchicken.com/.
+
 ```bash
 aws ec2 authorize-security-group-ingress \
   --group-id $SPARK_SG_ID \
@@ -121,6 +183,17 @@ aws ec2 authorize-security-group-ingress \
   --region $AWS_REGION
 ```
 
+**View all security group rules we just created:**
+```bash
+aws ec2 describe-security-groups \
+  --group-ids $SPARK_SG_ID \
+  --region $AWS_REGION \
+  --query 'SecurityGroups[0].IpPermissions' \
+  --output table
+```
+
+You should see all the rules we just added: SSH (22), Spark Web UI (8080-8081), Application UI (4040), and internal cluster communication.
+
 ---
 
 ## Part 3: Create SSH Key Pair
@@ -133,13 +206,41 @@ aws ec2 create-key-pair \
   --query 'KeyMaterial' \
   --output text \
   --region $AWS_REGION > spark-cluster-key.pem
+
+echo "Key pair created and saved to spark-cluster-key.pem"
 ```
+
+**Verify the key pair was created:**
+```bash
+aws ec2 describe-key-pairs \
+  --key-names spark-cluster-key \
+  --region $AWS_REGION \
+  --output table
+```
+
+**Expected output:**
+```
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+|                                                                       DescribeKeyPairs                                                                       |
++--------------------------------------------------------------------------------------------------------------------------------------------------------------+
+||                                                                          KeyPairs                                                                          ||
+|+----------------------------------+---------------------------------------------------------------+--------------------+------------------------+-----------+|
+||            CreateTime            |                        KeyFingerprint                         |      KeyName       |       KeyPairId        |  KeyType  ||
+|+----------------------------------+---------------------------------------------------------------+--------------------+------------------------+-----------+|
+||  2025-10-04T13:16:27.878000+00:00|  xx:xx:xx:xx:...                                              |  spark-cluster-key |  key-xxxxxxxxx         |  rsa      ||
+|+----------------------------------+---------------------------------------------------------------+--------------------+------------------------+-----------+|
+```
+
+You should see `spark-cluster-key` in the KeyName column - this is the key we just created!
 
 ### Step 3.2: Set Correct Permissions
 
 ```bash
 chmod 400 spark-cluster-key.pem
+ls -l spark-cluster-key.pem
 ```
+
+The permissions should show `-r--------` (read-only for owner).
 
 ---
 
@@ -168,23 +269,73 @@ aws ec2 run-instances \
   --instance-type t3.large \
   --key-name spark-cluster-key \
   --security-group-ids $SPARK_SG_ID \
+  --iam-instance-profile Name=LabInstanceProfile \
   --count 1 \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3"}}]' \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=spark-master},{Key=Role,Value=master}]' \
   --region $AWS_REGION
+
+echo "Master node launched!"
 ```
+
+**Important parameters:**
+- `--iam-instance-profile Name=LabInstanceProfile` - **CRITICAL**: Attaches the IAM role that grants this instance permissions to access AWS services like S3. Without this, Spark won't be able to read data from S3 buckets.
+- `--block-device-mappings` - Sets the root volume to 100GB (default is only 8GB)
+
+**Expected output:** You'll see a large JSON output. Key things to look for:
+- `"InstanceId": "i-xxxxxxxxx"` - Your instance ID
+- `"InstanceType": "t3.large"` - Instance type
+- `"KeyName": "spark-cluster-key"` - SSH key
+- `"State": { "Name": "pending" }` - Instance is starting
+- `"Tags": [{"Key": "Name", "Value": "spark-master"}]` - Our tag
+- `"SecurityGroups": [{"GroupName": "spark-cluster-sg"}]` - Our security group
+
+The instance will start in "pending" state and transition to "running" shortly.
+
+**Check the status of the master node:**
+```bash
+watch -n 2 'aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-master" \
+  --query "Reservations[*].Instances[*].[Tags[?Key==\`Name\`].Value | [0], InstanceId, State.Name]" \
+  --output table \
+  --region $AWS_REGION'
+```
+
+This will refresh every 2 seconds. Watch for the State to change from "pending" to "running". **Press Ctrl+C to exit** once you see the instance is in "running" state.
 
 ### Step 4.3: Launch Worker Nodes
 
+Launch 2 worker nodes (note the `--count 2` parameter):
 ```bash
 aws ec2 run-instances \
   --image-id $AMI_ID \
   --instance-type t3.large \
   --key-name spark-cluster-key \
   --security-group-ids $SPARK_SG_ID \
+  --iam-instance-profile Name=LabInstanceProfile \
   --count 2 \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3"}}]' \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=spark-worker},{Key=Role,Value=worker}]' \
   --region $AWS_REGION
+
+echo "Worker nodes launched!"
 ```
+
+**Important parameters:**
+- `--count 2` - Launches 2 identical worker instances
+- `--iam-instance-profile Name=LabInstanceProfile` - **CRITICAL**: Attaches the IAM role that grants these instances permissions to access AWS services like S3. Without this, Spark won't be able to read data from S3 buckets.
+- `--block-device-mappings` - Sets the root volume to 100GB on each worker
+
+**Monitor all 3 nodes until they're running:**
+```bash
+watch -n 2 'aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-master,spark-worker" \
+  --query "Reservations[*].Instances[*].[Tags[?Key==\`Name\`].Value | [0], InstanceId, State.Name]" \
+  --output table \
+  --region $AWS_REGION'
+```
+
+This will refresh every 2 seconds. Watch for all 3 instances (1 spark-master and 2 spark-worker) to change from "pending" to "running". **Press Ctrl+C to exit** once all instances show "running" state.
 
 ### Step 4.4: Wait for Instances to be Running
 
@@ -198,6 +349,10 @@ echo "All instances are now running!"
 
 ### Step 4.5: Get Instance Information
 
+Now we need to get both public and private IP addresses for our instances:
+- **Public IP**: Used to SSH into instances from your local machine
+- **Private IP**: Used for internal cluster communication between master and workers
+
 ```bash
 aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=spark-master,spark-worker" \
@@ -206,7 +361,7 @@ aws ec2 describe-instances \
   --region $AWS_REGION
 ```
 
-**Save the IP addresses:**
+**Save the Master IP addresses:**
 ```bash
 export MASTER_PUBLIC_IP=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=spark-master" "Name=instance-state-name,Values=running" \
@@ -224,34 +379,134 @@ echo "Master Public IP: $MASTER_PUBLIC_IP"
 echo "Master Private IP: $MASTER_PRIVATE_IP"
 ```
 
-**Get Worker IPs and save them:**
+**Get Worker IPs and save them automatically:**
+
+Since we launched 2 workers with `--count 2`, they're both in the same Reservation. We need to access them as `Instances[0]` and `Instances[1]`:
+
 ```bash
-aws ec2 describe-instances \
+export WORKER1_PUBLIC_IP=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
-  --query 'Reservations[*].Instances[*].[PublicIpAddress, PrivateIpAddress]' \
+  --query 'Reservations[0].Instances[0].PublicIpAddress' \
   --output text \
-  --region $AWS_REGION
+  --region $AWS_REGION)
+
+export WORKER1_PRIVATE_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+  --output text \
+  --region $AWS_REGION)
+
+export WORKER2_PUBLIC_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[1].PublicIpAddress' \
+  --output text \
+  --region $AWS_REGION)
+
+export WORKER2_PRIVATE_IP=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=spark-worker" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[1].PrivateIpAddress' \
+  --output text \
+  --region $AWS_REGION)
 ```
 
-Save the worker IPs from the output:
+**Verify all IPs are set:**
 ```bash
-export WORKER1_PUBLIC_IP=[paste first worker public IP here]
-export WORKER1_PRIVATE_IP=[paste first worker private IP here]
-export WORKER2_PUBLIC_IP=[paste second worker public IP here]
-export WORKER2_PRIVATE_IP=[paste second worker private IP here]
+echo "Master: $MASTER_PUBLIC_IP (public) / $MASTER_PRIVATE_IP (private)"
+echo "Worker 1: $WORKER1_PUBLIC_IP (public) / $WORKER1_PRIVATE_IP (private)"
+echo "Worker 2: $WORKER2_PUBLIC_IP (public) / $WORKER2_PRIVATE_IP (private)"
 ```
+
+Make sure all 6 IP addresses are displayed correctly before proceeding!
+
+### Step 4.6: Save IP Addresses to File
+
+Create a file with all the IP addresses so we can easily use them on the cluster nodes:
+
+```bash
+cat > cluster-ips.txt <<EOF
+MASTER_PUBLIC_IP=$MASTER_PUBLIC_IP
+MASTER_PRIVATE_IP=$MASTER_PRIVATE_IP
+WORKER1_PUBLIC_IP=$WORKER1_PUBLIC_IP
+WORKER1_PRIVATE_IP=$WORKER1_PRIVATE_IP
+WORKER2_PUBLIC_IP=$WORKER2_PUBLIC_IP
+WORKER2_PRIVATE_IP=$WORKER2_PRIVATE_IP
+EOF
+```
+
+**Verify the file:**
+```bash
+cat cluster-ips.txt
+```
+
+You should see all 6 IP addresses listed.
 
 ---
 
-## Part 5: Setup Master Node
+## Part 5: Copy Lab Files and IP Addresses to All Nodes
 
-### Step 5.1: Connect to Master Node
+Before we configure the nodes, let's copy the necessary lab files and IP addresses to all three nodes.
+
+### Step 5.1: Copy Files to Master Node
+
+Copy the lab files and IP addresses to the master node:
+
+```bash
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$MASTER_PUBLIC_IP:~/lab-spark-on-ec2
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/
+```
+
+**Verify the files were copied:**
+```bash
+ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+```
+
+You should see the lab files and IP addresses listed.
+
+### Step 5.2: Copy Files to Worker 1
+
+```bash
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER1_PUBLIC_IP:~/lab-spark-on-ec2
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER1_PUBLIC_IP:~/
+```
+
+**Verify the files were copied:**
+```bash
+ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+```
+
+### Step 5.3: Copy Files to Worker 2
+
+```bash
+scp -i spark-cluster-key.pem -r cluster-files ubuntu@$WORKER2_PUBLIC_IP:~/lab-spark-on-ec2
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$WORKER2_PUBLIC_IP:~/
+```
+
+**Verify the files were copied:**
+```bash
+ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP "ls -la ~/lab-spark-on-ec2 && cat ~/cluster-ips.txt"
+```
+
+All three nodes now have the lab files and IP addresses ready!
+
+---
+
+## Part 6: Setup Master Node
+
+### Step 6.1: Connect to Master Node
 
 ```bash
 ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP
 ```
 
-### Step 5.2: Update System and Install Java 17
+**Note:** The first time you connect, you'll see a prompt asking if you want to continue connecting:
+```
+The authenticity of host 'X.X.X.X (X.X.X.X)' can't be established.
+...
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+Type `yes` and press Enter to continue.
+
+### Step 6.2: Update System and Install Java 17
 
 Once connected to the master node, run:
 ```bash
@@ -262,11 +517,16 @@ java -version
 
 You should see output like: `openjdk version "17.x.x"`
 
-### Step 5.3: Install uv Package Manager
+### Step 6.3: Install uv Package Manager
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.cargo/env
+```
+
+Add uv to PATH:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 ```
 
 Verify uv installation:
@@ -274,17 +534,10 @@ Verify uv installation:
 uv --version
 ```
 
-### Step 5.4: Clone the Lab Repository
+### Step 6.4: Install Python Dependencies with uv
 
 ```bash
-cd ~
-git clone https://github.com/dsan-gu/lab-spark-on-ec2.git
-cd lab-spark-on-ec2
-```
-
-### Step 5.5: Install Python Dependencies with uv
-
-```bash
+cd ~/lab-spark-on-ec2
 uv sync
 ```
 
@@ -296,16 +549,42 @@ This will create a virtual environment and install all dependencies from pyproje
 - NLTK
 - and more
 
-### Step 5.6: Configure Environment Variables
+### Step 6.5: Download Apache Spark
+
+PySpark from pip doesn't include the cluster management scripts. Download the full Spark distribution:
+
+```bash
+cd ~
+wget https://downloads.apache.org/spark/spark-4.0.1/spark-4.0.1-bin-hadoop3.tgz
+tar -xzf spark-4.0.1-bin-hadoop3.tgz
+mv spark-4.0.1-bin-hadoop3 spark
+rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
+```
+
+### Step 6.6: Configure Environment Variables
+
+Set up the required environment variables:
 
 ```bash
 echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
-echo 'export SPARK_HOME=$(uv run python -c "import pyspark; import os; print(os.path.dirname(os.path.dirname(pyspark.__file__)))")' >> ~/.bashrc
+echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Step 5.7: Verify Installation
+**Verify the variables are set:**
+```bash
+echo "JAVA_HOME: $JAVA_HOME"
+echo "SPARK_HOME: $SPARK_HOME"
+ls $SPARK_HOME/sbin/start-master.sh
+```
+
+You should see the paths printed and the start-master.sh script should exist.
+
+### Step 6.7: Verify Installation
 
 ```bash
 cd ~/lab-spark-on-ec2
@@ -314,45 +593,108 @@ uv run python spark_installation_test.py
 
 You should see all tests pass with green checkmarks.
 
-### Step 5.8: Configure Spark for Cluster Mode
+### Step 6.8: Load IP Addresses from File
+
+Load the IP addresses from the cluster-ips.txt file we copied earlier:
+
+```bash
+source ~/cluster-ips.txt
+```
+
+Verify all IPs are loaded:
+```bash
+echo "Master: $MASTER_PRIVATE_IP"
+echo "Worker 1: $WORKER1_PRIVATE_IP"
+echo "Worker 2: $WORKER2_PRIVATE_IP"
+```
+
+You should see the private IP addresses for all three nodes.
+
+### Step 6.9: Create Spark Configuration Files
+
+Create the Spark configuration files:
 
 ```bash
 cd $SPARK_HOME/conf
-sudo cp spark-env.sh.template spark-env.sh
 ```
 
-Edit spark-env.sh:
+### Step 6.10: Create spark-env.sh
+
+Create the Spark environment configuration file:
+
 ```bash
-sudo nano spark-env.sh
-```
-
-Add these lines at the end (replace `[MASTER_PRIVATE_IP]` with your actual master private IP):
-```
+cat > $SPARK_HOME/conf/spark-env.sh <<EOF
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export SPARK_MASTER_HOST=[MASTER_PRIVATE_IP]
+export SPARK_MASTER_HOST=$MASTER_PRIVATE_IP
 export SPARK_MASTER_PORT=7077
 export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
 export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+EOF
+
+chmod +x $SPARK_HOME/conf/spark-env.sh
 ```
 
-Save and exit (Ctrl+O, Enter, Ctrl+X).
+**Verify the spark-env.sh file:**
+```bash
+cat $SPARK_HOME/conf/spark-env.sh
+```
 
-### Step 5.9: Configure Workers
+### Step 6.11: Create workers file
+
+Load the cluster IPs and create the workers configuration file:
 
 ```bash
-sudo cp workers.template workers
-sudo nano workers
+# Load the cluster IPs
+source ~/cluster-ips.txt
+
+# Verify IPs are loaded
+echo "Master: $MASTER_PRIVATE_IP"
+echo "Worker 1: $WORKER1_PRIVATE_IP"
+echo "Worker 2: $WORKER2_PRIVATE_IP"
+
+# Create the workers file
+cat > $SPARK_HOME/conf/workers <<EOF
+$WORKER1_PRIVATE_IP
+$WORKER2_PRIVATE_IP
+EOF
 ```
 
-Remove localhost and add worker private IPs:
-```
-[WORKER1_PRIVATE_IP]
-[WORKER2_PRIVATE_IP]
+**Verify the workers file:**
+```bash
+cat $SPARK_HOME/conf/workers
 ```
 
-Replace with your actual worker private IPs. Save and exit.
+You should see both worker private IPs listed.
 
-### Step 5.10: Exit Master Node
+### Step 6.12: Download AWS S3 Libraries for Spark
+
+Spark needs additional libraries to read from S3. Download the Hadoop AWS and all required AWS SDK JARs:
+
+```bash
+cd $SPARK_HOME/jars
+
+# Download Hadoop AWS library
+wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar
+
+# Download AWS SDK v1 bundle (for backward compatibility)
+wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+
+# Download AWS SDK v2 bundles (required by Hadoop 3.4.1)
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.29.27/bundle-2.29.27.jar
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/url-connection-client/2.29.27/url-connection-client-2.29.27.jar
+```
+
+**Verify all JARs were downloaded:**
+```bash
+ls -lh $SPARK_HOME/jars/hadoop-aws-3.4.1.jar \
+       $SPARK_HOME/jars/aws-java-sdk-bundle-1.12.262.jar \
+       $SPARK_HOME/jars/bundle-2.29.27.jar \
+       $SPARK_HOME/jars/url-connection-client-2.29.27.jar
+```
+
+You should see all 4 JAR files listed with their sizes.
+
+### Step 6.13: Exit Master Node
 
 ```bash
 exit
@@ -360,75 +702,12 @@ exit
 
 ---
 
-## Part 6: Setup Worker Node 1
+## Part 7: Setup Worker Node 1
 
-### Step 6.1: Connect to Worker 1
+### Step 7.1: Connect to Worker 1
 
 ```bash
 ssh -i spark-cluster-key.pem ubuntu@$WORKER1_PUBLIC_IP
-```
-
-### Step 6.2: Install Java 17 and uv
-
-```bash
-sudo apt-get update
-sudo apt-get install -y openjdk-17-jdk
-java -version
-
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.cargo/env
-uv --version
-```
-
-### Step 6.3: Clone Lab Repository and Install Dependencies
-
-```bash
-cd ~
-git clone https://github.com/dsan-gu/lab-spark-on-ec2.git
-cd lab-spark-on-ec2
-uv sync
-```
-
-### Step 6.4: Configure Environment Variables
-
-```bash
-echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
-echo 'export SPARK_HOME=$(uv run python -c "import pyspark; import os; print(os.path.dirname(os.path.dirname(pyspark.__file__)))")' >> ~/.bashrc
-echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Step 6.5: Configure Spark Environment
-
-```bash
-cd $SPARK_HOME/conf
-sudo cp spark-env.sh.template spark-env.sh
-sudo nano spark-env.sh
-```
-
-Add these lines:
-```
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
-export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
-```
-
-Save and exit.
-
-### Step 6.6: Exit Worker 1
-
-```bash
-exit
-```
-
----
-
-## Part 7: Setup Worker Node 2
-
-### Step 7.1: Connect to Worker 2
-
-```bash
-ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP
 ```
 
 ### Step 7.2: Install Java 17 and uv
@@ -439,46 +718,81 @@ sudo apt-get install -y openjdk-17-jdk
 java -version
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.cargo/env
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 uv --version
 ```
 
-### Step 7.3: Clone Lab Repository and Install Dependencies
+### Step 7.3: Install Python Dependencies
 
 ```bash
-cd ~
-git clone https://github.com/dsan-gu/lab-spark-on-ec2.git
-cd lab-spark-on-ec2
+cd ~/lab-spark-on-ec2
 uv sync
 ```
 
-### Step 7.4: Configure Environment Variables
+### Step 7.4: Download Apache Spark
+
+```bash
+cd ~
+wget https://downloads.apache.org/spark/spark-4.0.1/spark-4.0.1-bin-hadoop3.tgz
+tar -xzf spark-4.0.1-bin-hadoop3.tgz
+mv spark-4.0.1-bin-hadoop3 spark
+rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
+```
+
+### Step 7.5: Configure Environment Variables
 
 ```bash
 echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
-echo 'export SPARK_HOME=$(uv run python -c "import pyspark; import os; print(os.path.dirname(os.path.dirname(pyspark.__file__)))")' >> ~/.bashrc
+echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Step 7.5: Configure Spark Environment
+### Step 7.6: Create Spark Configuration
+
+Create the Spark environment file:
 
 ```bash
-cd $SPARK_HOME/conf
-sudo cp spark-env.sh.template spark-env.sh
-sudo nano spark-env.sh
-```
-
-Add these lines:
-```
+cat > $SPARK_HOME/conf/spark-env.sh <<EOF
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
 export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+EOF
+
+chmod +x $SPARK_HOME/conf/spark-env.sh
 ```
 
-Save and exit.
+### Step 7.7: Download AWS S3 Libraries for Spark
 
-### Step 7.6: Exit Worker 2
+Download the same AWS libraries as on the master node:
+
+```bash
+cd $SPARK_HOME/jars
+
+# Download Hadoop AWS library
+wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar
+
+# Download AWS SDK v1 bundle (for backward compatibility)
+wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+
+# Download AWS SDK v2 bundles (required by Hadoop 3.4.1)
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.29.27/bundle-2.29.27.jar
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/url-connection-client/2.29.27/url-connection-client-2.29.27.jar
+```
+
+**Verify all JARs were downloaded:**
+```bash
+ls -lh $SPARK_HOME/jars/hadoop-aws-3.4.1.jar \
+       $SPARK_HOME/jars/aws-java-sdk-bundle-1.12.262.jar \
+       $SPARK_HOME/jars/bundle-2.29.27.jar \
+       $SPARK_HOME/jars/url-connection-client-2.29.27.jar
+```
+
+### Step 7.8: Exit Worker 1
 
 ```bash
 exit
@@ -486,16 +800,114 @@ exit
 
 ---
 
-## Part 8: Setup SSH Keys for Passwordless Access
+## Part 8: Setup Worker Node 2
 
-### Step 8.1: Copy Private Key to Master
+### Step 8.1: Connect to Worker 2
+
+```bash
+ssh -i spark-cluster-key.pem ubuntu@$WORKER2_PUBLIC_IP
+```
+
+### Step 8.2: Install Java 17 and uv
+
+```bash
+sudo apt-get update
+sudo apt-get install -y openjdk-17-jdk
+java -version
+
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+uv --version
+```
+
+### Step 8.3: Install Python Dependencies
+
+```bash
+cd ~/lab-spark-on-ec2
+uv sync
+```
+
+### Step 8.4: Download Apache Spark
+
+```bash
+cd ~
+wget https://downloads.apache.org/spark/spark-4.0.1/spark-4.0.1-bin-hadoop3.tgz
+tar -xzf spark-4.0.1-bin-hadoop3.tgz
+mv spark-4.0.1-bin-hadoop3 spark
+rm spark-4.0.1-bin-hadoop3.tgz  # Clean up to save disk space
+```
+
+### Step 8.5: Configure Environment Variables
+
+```bash
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+echo 'export SPARK_HOME=$HOME/spark' >> ~/.bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+echo 'export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin' >> ~/.bashrc
+echo 'export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+echo 'export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Step 8.6: Create Spark Configuration
+
+Create the Spark environment file:
+
+```bash
+cat > $SPARK_HOME/conf/spark-env.sh <<EOF
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PYSPARK_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+export PYSPARK_DRIVER_PYTHON=/home/ubuntu/lab-spark-on-ec2/.venv/bin/python
+EOF
+
+chmod +x $SPARK_HOME/conf/spark-env.sh
+```
+
+### Step 8.7: Download AWS S3 Libraries for Spark
+
+Download the same AWS libraries as on the master and worker 1:
+
+```bash
+cd $SPARK_HOME/jars
+
+# Download Hadoop AWS library
+wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar
+
+# Download AWS SDK v1 bundle (for backward compatibility)
+wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+
+# Download AWS SDK v2 bundles (required by Hadoop 3.4.1)
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.29.27/bundle-2.29.27.jar
+wget https://repo1.maven.org/maven2/software/amazon/awssdk/url-connection-client/2.29.27/url-connection-client-2.29.27.jar
+```
+
+**Verify all JARs were downloaded:**
+```bash
+ls -lh $SPARK_HOME/jars/hadoop-aws-3.4.1.jar \
+       $SPARK_HOME/jars/aws-java-sdk-bundle-1.12.262.jar \
+       $SPARK_HOME/jars/bundle-2.29.27.jar \
+       $SPARK_HOME/jars/url-connection-client-2.29.27.jar
+```
+
+### Step 8.8: Exit Worker 2
+
+```bash
+exit
+```
+
+---
+
+## Part 9: Setup SSH Keys for Passwordless Access
+
+### Step 9.1: Copy Private Key to Master
 
 From your EC2 instance (where you have the spark-cluster-key.pem file):
 ```bash
 scp -i spark-cluster-key.pem spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP:~/.ssh/
 ```
 
-### Step 8.2: Connect to Master and Configure SSH
+### Step 9.2: Connect to Master and Configure SSH
 
 ```bash
 ssh -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP
@@ -519,13 +931,18 @@ chmod 600 ~/.ssh/config
 
 ---
 
-## Part 9: Start Spark Cluster
+## Part 10: Start Spark Cluster
 
-### Step 9.1: Start Master Node
+### Step 10.1: Start Master Node
 
 On the master node (should still be connected):
 ```bash
 $SPARK_HOME/sbin/start-master.sh
+```
+
+**Expected output:**
+```
+starting org.apache.spark.deploy.master.Master, logging to /home/ubuntu/spark/logs/spark-ubuntu-org.apache.spark.deploy.master.Master-1-ip-172-31-86-205.out
 ```
 
 Verify master is running:
@@ -533,34 +950,90 @@ Verify master is running:
 jps
 ```
 
-You should see `Master` in the output.
+**Expected output:**
+```
+XXXX Master
+XXXX Jps
+```
 
-### Step 9.2: Start Worker Nodes from Master
+**Note:** `jps` (Java Process Status) is a command that lists all running Java processes. You should see `Master` in the output, which confirms the Spark Master process is running.
+
+### Step 10.2: Start Worker Nodes from Master
 
 ```bash
 $SPARK_HOME/sbin/start-workers.sh
 ```
 
-### Step 9.3: Verify Cluster Status
+**Expected output:**
+```
+172.31.80.136: starting org.apache.spark.deploy.worker.Worker, logging to /home/ubuntu/spark/logs/spark-ubuntu-org.apache.spark.deploy.worker.Worker-1-ip-172-31-80-136.out
+172.31.94.40: starting org.apache.spark.deploy.worker.Worker, logging to /home/ubuntu/spark/logs/spark-ubuntu-org.apache.spark.deploy.worker.Worker-1-ip-172-31-94-40.out
+```
+
+You should see both worker IPs in the output. If you see `localhost` instead, check your `$SPARK_HOME/conf/workers` file (see troubleshooting below).
+
+### Step 10.3: Verify Cluster Status
 
 ```bash
 jps
 ```
 
-Check the Spark Master Web UI. Open a browser and navigate to:
+**Expected output:**
+```
+XXXX Master
+XXXX Jps
+```
+
+On master, you should only see `Master`. The workers are running on the other nodes.
+
+### Step 10.4: Access the Spark Web UI
+
+**Access the Web UI from your laptop:**
+
+Open a browser **on your laptop** and navigate to:
 ```
 http://[MASTER_PUBLIC_IP]:8080
 ```
 
-Replace `[MASTER_PUBLIC_IP]` with your actual master public IP.
+Replace `[MASTER_PUBLIC_IP]` with your actual master public IP (use the value from Step 4.5).
 
-You should see 2 workers connected.
+**IMPORTANT SECURITY NOTE:**
+
+This Web UI is accessible **only from your IP address** that you configured in Step 2.2. We restricted access using the `/32` CIDR notation, which means only your specific IP can access the UI, not the entire internet.
+
+**If you can't access the Web UI:**
+
+1. **Check your current IP:** Visit https://ipchicken.com/ from your laptop
+2. **Verify it matches:** Make sure it's the same IP you used in Step 2.2 (`$MY_IP`)
+3. **If your IP changed:** You'll need to update the security group rule:
+
+```bash
+# From your EC2 instance where you ran the setup
+export NEW_IP=[your current IP from ipchicken.com]
+aws ec2 authorize-security-group-ingress \
+  --group-id $SPARK_SG_ID \
+  --protocol tcp \
+  --port 8080-8081 \
+  --cidr ${NEW_IP}/32 \
+  --region $AWS_REGION
+```
+
+**What you should see in the Web UI:**
+
+You should see the Spark Master Web UI showing:
+- URL: `spark://[MASTER_PRIVATE_IP]:7077`
+- Status: ALIVE
+- Workers: 2 (both should be in ALIVE state)
+- Cores: Total available cores from both workers
+- Memory: Total available memory from both workers
+
+If you don't see 2 workers, see the Troubleshooting section below.
 
 ---
 
-## Part 10: Test the Cluster with Lab Code
+## Part 11: Test the Cluster with Lab Code
 
-### Step 10.1: Test Spark Installation
+### Step 11.1: Test Spark Installation
 
 Still on master node:
 ```bash
@@ -570,7 +1043,7 @@ uv run python spark_installation_test.py
 
 All tests should pass.
 
-### Step 10.2: Run Problem 1 (Example Solution)
+### Step 11.2: Run Problem 1 (Example Solution)
 
 ```bash
 uv run python nyc_tlc_problem1.py 2>&1 | tee problem1.txt
@@ -581,22 +1054,49 @@ This will:
 - Process it using Spark
 - Generate `daily_averages.csv`
 
-### Step 10.3: Run Problem 1 on the Cluster
+### Step 11.3: Run Problem 1 on the Cluster (Distributed Mode)
 
-To run on the cluster instead of local mode, you need to modify the script to use the cluster master URL:
+The previous step ran in local mode (all processing on one node). To run in **cluster mode** with distributed processing across all worker nodes, we'll use a special cluster version that reads data directly from S3.
 
-```bash
-# First, find out your Spark master URL
-echo "spark://$MASTER_PRIVATE_IP:7077"
-```
+**Why read from S3?** In cluster mode, tasks are distributed across multiple nodes. If data files are stored locally on only one node, worker nodes can't access them. Reading directly from S3 allows all nodes to access the same data.
 
-Then edit the Python script to use this URL instead of local mode, or run with spark-submit:
+First, copy the cluster version script from your EC2 instance:
 
 ```bash
-spark-submit --master spark://$MASTER_PRIVATE_IP:7077 nyc_tlc_problem1.py 2>&1 | tee problem1_cluster.txt
+# From your EC2 instance (where you have cluster-files/)
+source cluster-ips.txt
+scp -i spark-cluster-key.pem cluster-files/nyc_tlc_problem1_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/lab-spark-on-ec2/
 ```
 
-### Step 10.4: Monitor Jobs
+Then on the master node, run the cluster version:
+
+```bash
+# Load the cluster IPs
+source ~/cluster-ips.txt
+
+# Verify the master IP is set
+echo "Spark Master URL: spark://$MASTER_PRIVATE_IP:7077"
+
+# IMPORTANT: If you added AWS JARs after starting the cluster, restart it first
+# This ensures the new JARs are loaded by all nodes
+$SPARK_HOME/sbin/stop-all.sh
+$SPARK_HOME/sbin/start-all.sh
+
+# Wait a few seconds for workers to connect
+sleep 5
+
+# Run the cluster version (reads from S3, distributes work across all nodes)
+cd ~/lab-spark-on-ec2
+uv run python nyc_tlc_problem1_cluster.py spark://$MASTER_PRIVATE_IP:7077 2>&1 | tee problem1_cluster.txt
+```
+
+**What's different in the cluster version?**
+- Uses `s3a://` paths instead of local files
+- Configures S3A filesystem with IAM instance profile credentials
+- Connects to the Spark master to distribute work across workers
+- Data is read directly from S3 by all worker nodes
+
+### Step 11.4: Monitor Jobs
 
 While jobs are running, you can monitor them in the Spark Web UI:
 - Master UI: `http://[MASTER_PUBLIC_IP]:8080`
@@ -604,7 +1104,7 @@ While jobs are running, you can monitor them in the Spark Web UI:
 
 ---
 
-## Part 11: Cluster Management
+## Part 12: Cluster Management
 
 ### Stop the Cluster
 
@@ -635,7 +1135,7 @@ tail -f $SPARK_HOME/logs/spark-*-worker-*.out
 
 ---
 
-## Part 12: Running Lab Assignments on the Cluster
+## Part 13: Running Lab Assignments on the Cluster
 
 ### Modifying Scripts for Cluster Execution
 
@@ -674,7 +1174,7 @@ spark-submit \
 
 ---
 
-## Part 13: Cleanup (When Done)
+## Part 14: Cleanup (When Done)
 
 ### Terminate EC2 Instances
 

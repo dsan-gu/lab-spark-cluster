@@ -35,10 +35,13 @@ Thumbs.db
 
 # AWS
 .aws/
+awscliv2.zip
+aws/
 
 # Spark cluster setup files
 *.pem
 spark-cluster-key.pem
+cluster-ips.txt
 
 # Temporary and output files
 *.log
