@@ -170,7 +170,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 
 1. **Local Development (Recommended Approach):**
    - Download one sample file: `reddit_sample.parquet` (in current directory)
-   - Create `reddit_analysis_local.py` that works with local file
+   - Create `reddit_analysis_local.py` that works with local file (save in repo root)
    - Use local Spark session (similar to the lab exercises):
      ```python
      spark = SparkSession.builder \
@@ -180,7 +180,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
      df = spark.read.parquet("reddit_sample.parquet")
      ```
    - Test your analysis logic on the sample file
-   - Verify outputs are correct
+   - Verify outputs are correct (3 CSV files with _local suffix)
 
 2. **Cluster Deployment:**
    - Once local version works, create `reddit_analysis_cluster.py`
@@ -196,20 +196,37 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
      source cluster-config.txt
 
      # Copy your cluster script to master node
-     scp -i $KEY_FILE reddit_analysis_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
+     scp -i $KEY_FILE reddit_analysis_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/
      ```
    - SSH to master and run on your Spark cluster:
      ```bash
      ssh -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP
-     cd ~/spark-cluster
      source cluster-ips.txt
      uv run python reddit_analysis_cluster.py spark://$MASTER_PRIVATE_IP:7077
+     ```
+   - Download results from cluster:
+     ```bash
+     # From your EC2 instance (not on the cluster)
+     source cluster-config.txt
+     scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/*.csv .
+
+     # Rename cluster outputs to include _cluster suffix
+     mv dataset_stats.csv dataset_stats_cluster.csv
+     mv top_subreddits.csv top_subreddits_cluster.csv
+     mv peak_hours.csv peak_hours_cluster.csv
      ```
 
 **Deliverables:**
 - `reddit_analysis_local.py` (local development version)
 - `reddit_analysis_cluster.py` (cluster version)
-- Output CSV files from cluster run
+- Local output CSV files:
+  - `dataset_stats_local.csv` (Unique comments and users)
+  - `top_subreddits_local.csv` (Top 10 most popular subreddits)
+  - `peak_hours_local.csv` (Hourly comment distribution)
+- Cluster output CSV files:
+  - `dataset_stats_cluster.csv` (Unique comments and users)
+  - `top_subreddits_cluster.csv` (Top 10 most popular subreddits)
+  - `peak_hours_cluster.csv` (Hourly comment distribution)
 - Screenshots of:
   - Spark Web UI showing the job execution
   - Application UI showing the DAG (Directed Acyclic Graph)
@@ -247,12 +264,12 @@ lab-spark-cluster/
 ├── AUTOMATION_README.md           # Problem 2: Automated setup guide
 ├── setup-spark-cluster.sh         # Automated cluster creation script
 ├── cleanup-spark-cluster.sh       # Automated cluster cleanup script
+├── reddit_analysis_local.py       # Problem 3: Local analysis script
+├── reddit_analysis_cluster.py     # Problem 3: Cluster analysis script
 ├── cluster-files/                 # Configuration files for cluster nodes
-│   ├── nyc_tlc_problem1_cluster.py
-│   ├── reddit_analysis_local.py
-│   └── reddit_analysis_cluster.py
+│   └── nyc_tlc_problem1_cluster.py
 ├── pyproject.toml                 # Python dependencies
-└── .gitignore                     # Git ignore file (includes *.pem)
+└── .gitignore                     # Git ignore file (includes *.pem, *.parquet)
 ```
 
 ## Getting Started
