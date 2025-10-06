@@ -125,15 +125,16 @@ aws s3 mb s3://your-netid-spark-reddit
 
 2. **Copy Reddit data from shared dataset:**
 ```bash
-aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
-  s3://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/ \
-  --recursive
+aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/ \
+  s3://your-netid-spark-reddit/reddit/comments/ \
+  --recursive \
+  --request-payer requester
 ```
 
 #### Problem 3: Reddit Subreddit Analysis
 
 **Dataset:** Reddit comments from January 2024 (Parquet format)
-- Source: `s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/*.parquet`
+- Source: `s3://dsan6000-datasets/reddit/parquet/comments/` (use `--request-payer requester` to access)
 - Format: Parquet files with columns including `subreddit`, `body`, `author`, `created_utc`, etc.
 
 **Task:** Analyze the Reddit comments data to answer the following questions:
