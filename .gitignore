@@ -48,6 +48,7 @@ cluster-config.txt
 *.log
 *.txt
 *.csv
+*.parquet
 output/
 logs/
 

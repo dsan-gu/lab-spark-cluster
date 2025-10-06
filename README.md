@@ -134,9 +134,9 @@ export PATH=$PATH:$JAVA_HOME/bin
 
 2. **Download a sample file for local development:**
 ```bash
-# Download one file to test locally first
+# Download one file to test locally first (saves to current directory)
 aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet \
-  ~/reddit_sample.parquet \
+  reddit_sample.parquet \
   --request-payer requester
 ```
 
@@ -168,7 +168,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 **Development Workflow:**
 
 1. **Local Development (Recommended Approach):**
-   - Download one sample file: `~/reddit_sample.parquet`
+   - Download one sample file: `reddit_sample.parquet` (in current directory)
    - Create `reddit_analysis_local.py` that works with local file
    - Use local Spark session (similar to the lab exercises):
      ```python
@@ -176,7 +176,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
          .appName("Reddit_Local") \
          .getOrCreate()
 
-     df = spark.read.parquet("~/reddit_sample.parquet")
+     df = spark.read.parquet("reddit_sample.parquet")
      ```
    - Test your analysis logic on the sample file
    - Verify outputs are correct

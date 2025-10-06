@@ -206,16 +206,16 @@ def main():
     # Create local Spark session
     spark = create_spark_session()
 
-    # Path to local sample file
+    # Path to local sample file (in current directory)
     # Students should download this file first:
     # aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet \
-    #   ~/reddit_sample.parquet --request-payer requester
+    #   reddit_sample.parquet --request-payer requester
 
-    data_path = os.path.expanduser("~/reddit_sample.parquet")
+    data_path = "reddit_sample.parquet"
 
     print(f"\n📁 Data source: {data_path}")
     print("⚠️  Make sure you downloaded the sample file first!")
-    print("   Command: aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet ~/reddit_sample.parquet --request-payer requester")
+    print("   Command: aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet reddit_sample.parquet --request-payer requester")
 
     # Run analyses
     success = True
