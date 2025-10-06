@@ -9,12 +9,29 @@ This script analyzes Reddit comments from January 2024 to find:
 This is the LOCAL development version that works with a sample file.
 """
 
+import os
 import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, count, hour, from_unixtime,
     desc
 )
+
+# Set JAVA_HOME if not already set
+if not os.environ.get('JAVA_HOME'):
+    # Try common Java installation paths
+    java_paths = [
+        '/usr/lib/jvm/java-17-openjdk-amd64',
+        '/usr/lib/jvm/java-11-openjdk-amd64',
+        '/usr/lib/jvm/default-java',
+    ]
+    for path in java_paths:
+        if os.path.exists(path):
+            os.environ['JAVA_HOME'] = path
+            print(f"✅ Set JAVA_HOME to: {path}")
+            break
+    else:
+        print("⚠️  Warning: Could not find Java installation. Please set JAVA_HOME manually.")
 
 
 def create_spark_session():
