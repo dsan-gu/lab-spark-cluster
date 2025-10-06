@@ -5,6 +5,8 @@ description = "Step-by-step guide for setting up a 3-node Apache Spark cluster o
 requires-python = ">=3.10"
 dependencies = [
     "awscli>=1.42.35",
+    "pyspark>=4.0.0",
+    "pandas>=2.0.0",
 ]
 
 [dependency-groups]

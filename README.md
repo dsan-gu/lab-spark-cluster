@@ -4,7 +4,7 @@ Step-by-step guide for setting up a 3-node Apache Spark cluster on AWS EC2.
 
 ## Overview
 
-This lab provides hands-on experience with setting up and managing a distributed Apache Spark cluster on Amazon EC2. You will learn how to create, configure, and use a Spark cluster through three progressive steps:
+This lab provides hands-on experience with setting up and managing a distributed Apache Spark cluster on Amazon EC2. You will learn how to create, configure, and use a Spark cluster through three progressive problems:
 
 1. **Manual Setup** - Build cluster step-by-step to understand all components
 2. **Automated Setup** - Use automation scripts for rapid deployment
@@ -30,9 +30,9 @@ By completing this lab, you will gain practical experience with:
 - AWS CLI configured with credentials
 - Your laptop's public IP address (get from https://ipchicken.com/)
 
-## Three-Step Learning Approach
+## Three-Problem Learning Approach
 
-### Step 1: Manual Cluster Setup (Learning the Fundamentals) - 20 Points
+## Problem 1: Manual Cluster Setup (Learning the Fundamentals) - 20 Points
 
 **Objective:** Gain hands-on understanding of every component involved in creating a Spark cluster.
 
@@ -66,7 +66,7 @@ Follow the detailed instructions in [SPARK_CLUSTER_SETUP.md](SPARK_CLUSTER_SETUP
 
 **⚠️ WARNING: If you do not delete your cluster, you will exhaust the funds in your account. Always delete your cluster when done!**
 
-### Step 2: Automated Cluster Setup (Scripted Deployment) - 20 Points
+## Problem 2: Automated Cluster Setup (Scripted Deployment) - 20 Points
 
 **Objective:** Learn how to automate cluster deployment for rapid provisioning.
 
@@ -108,11 +108,11 @@ This script automates everything from Step 1, including:
 ./cleanup-spark-cluster.sh
 ```
 
-Or manually delete resources as in Step 1.
+Or manually delete resources as in Problem 1.
 
 **⚠️ WARNING: If you do not delete your cluster, you will exhaust the funds in your account. Always delete your cluster when done! Use [cleanup-spark-cluster.sh](cleanup-spark-cluster.sh) for automated cleanup or manual deletion.**
 
-### Step 3: Real-World Data Analysis (Reddit Data Processing) - 10 Points
+## Problem 3: Real-World Data Analysis (Reddit Data Processing) - 20 Points
 
 **Objective:** Apply your Spark cluster skills to analyze real-world social media data.
 
@@ -215,10 +215,10 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 
 - **Instance type:** t3.large
 - **Number of instances:**
-  - Step 1: 3 instances (1 master + 2 workers) ≈ $0.20/hour
-  - Step 2: 4 instances (1 master + 3 workers) ≈ $0.25/hour
-  - Step 3: 4 instances + S3 storage ≈ $0.25/hour + minimal storage costs
-- **Estimated total cost:** $6-8 for completing all three steps
+  - Problem 1: 3 instances (1 master + 2 workers) ≈ $0.20/hour
+  - Problem 2: 4 instances (1 master + 3 workers) ≈ $0.25/hour
+  - Problem 3: 4 instances + S3 storage ≈ $0.25/hour + minimal storage costs
+- **Estimated total cost:** $6-8 for completing all three problems
 
 **Always remember to terminate your instances and delete S3 data when done to avoid unnecessary charges.**
 
@@ -226,12 +226,15 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 
 ```
 lab-spark-cluster/
-├── README.md                      # This file - overview and 3-step guide
-├── SPARK_CLUSTER_SETUP.md         # Step 1: Manual setup instructions
-├── AUTOMATION_README.md           # Step 2: Automated setup guide
+├── README.md                      # This file - overview and 3-problem guide
+├── SPARK_CLUSTER_SETUP.md         # Problem 1: Manual setup instructions
+├── AUTOMATION_README.md           # Problem 2: Automated setup guide
 ├── setup-spark-cluster.sh         # Automated cluster creation script
 ├── cleanup-spark-cluster.sh       # Automated cluster cleanup script
 ├── cluster-files/                 # Configuration files for cluster nodes
+│   ├── nyc_tlc_problem1_cluster.py
+│   ├── reddit_analysis_local.py
+│   └── reddit_analysis_cluster.py
 ├── pyproject.toml                 # Python dependencies
 └── .gitignore                     # Git ignore file (includes *.pem)
 ```
