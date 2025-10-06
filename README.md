@@ -118,7 +118,21 @@ Or manually delete resources as in Problem 1.
 
 #### Setup
 
-1. **Download a sample file for local development:**
+1. **Install Java (required for local PySpark development):**
+```bash
+# Install Java 17 (required for PySpark 4.x)
+sudo apt update
+sudo apt install -y openjdk-17-jdk-headless
+
+# Verify installation
+java -version
+
+# Set JAVA_HOME (add to ~/.bashrc for persistence)
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$PATH:$JAVA_HOME/bin
+```
+
+2. **Download a sample file for local development:**
 ```bash
 # Download one file to test locally first
 aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet \
@@ -126,12 +140,12 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comment
   --request-payer requester
 ```
 
-2. **Create S3 bucket for your data (after local testing works):**
+3. **Create S3 bucket for your data (after local testing works):**
 ```bash
 aws s3 mb s3://your-netid-spark-reddit
 ```
 
-3. **Copy full Reddit data from shared dataset (after local testing works):**
+4. **Copy full Reddit data from shared dataset (after local testing works):**
 ```bash
 aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
   s3://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/ \
