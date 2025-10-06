@@ -262,7 +262,7 @@ def main():
 
     # S3 path to Reddit data
     # Students should update this to their own bucket
-    data_path = "s3a://your-netid-spark-reddit/reddit/comments/*.parquet"
+    data_path = "s3a://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/*.parquet"
 
     print(f"\n📁 Data source: {data_path}")
     print("⚠️  Note: Update 'your-netid' in the script to match your S3 bucket name")
