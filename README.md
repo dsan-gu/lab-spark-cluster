@@ -121,7 +121,7 @@ Or manually delete resources as in Step 1.
 1. **Download a sample file for local development:**
 ```bash
 # Download one file to test locally first
-aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_9.parquet \
+aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet \
   ~/reddit_sample.parquet \
   --request-payer requester
 ```
