@@ -211,7 +211,7 @@ def main():
     # aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_97.parquet \
     #   ~/reddit_sample.parquet --request-payer requester
 
-    data_path = "~/reddit_sample.parquet"
+    data_path = os.path.expanduser("~/reddit_sample.parquet")
 
     print(f"\n📁 Data source: {data_path}")
     print("⚠️  Make sure you downloaded the sample file first!")
