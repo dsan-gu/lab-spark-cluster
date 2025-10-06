@@ -102,9 +102,30 @@ log_success "cluster-files directory found"
 
 log_step "Part 2: Creating Security Group"
 
+SG_NAME="spark-cluster-sg-$(date +%s)"
+
+# Check if security group with this pattern exists and delete it
+log_info "Checking for existing security groups..."
+EXISTING_SG=$(aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=spark-cluster-sg-*" \
+  --query 'SecurityGroups[0].GroupId' \
+  --output text \
+  --region $AWS_REGION 2>/dev/null || echo "None")
+
+if [ "$EXISTING_SG" != "None" ] && [ "$EXISTING_SG" != "" ]; then
+    log_warn "Found existing security group: $EXISTING_SG"
+    log_info "Attempting to delete existing security group..."
+    if aws ec2 delete-security-group --group-id $EXISTING_SG --region $AWS_REGION 2>/dev/null; then
+        log_success "Deleted existing security group"
+        sleep 2
+    else
+        log_warn "Could not delete existing security group (may be in use)"
+    fi
+fi
+
 log_info "Creating security group..."
 export SPARK_SG_ID=$(aws ec2 create-security-group \
-  --group-name spark-cluster-sg-$(date +%s) \
+  --group-name $SG_NAME \
   --description "Security group for Spark cluster" \
   --region $AWS_REGION \
   --query 'GroupId' \
@@ -194,6 +215,27 @@ log_step "Part 3: Creating SSH Key Pair"
 KEY_NAME="spark-cluster-key-$(date +%s)"
 KEY_FILE="${KEY_NAME}.pem"
 
+# Check if key pairs with this pattern exist and delete them
+log_info "Checking for existing key pairs..."
+EXISTING_KEYS=$(aws ec2 describe-key-pairs \
+  --filters "Name=key-name,Values=spark-cluster-key-*" \
+  --query 'KeyPairs[*].KeyName' \
+  --output text \
+  --region $AWS_REGION 2>/dev/null || echo "")
+
+if [ -n "$EXISTING_KEYS" ]; then
+    for KEY in $EXISTING_KEYS; do
+        log_warn "Found existing key pair: $KEY"
+        log_info "Attempting to delete existing key pair..."
+        if aws ec2 delete-key-pair --key-name $KEY --region $AWS_REGION 2>/dev/null; then
+            log_success "Deleted existing key pair: $KEY"
+        else
+            log_warn "Could not delete key pair: $KEY"
+        fi
+    done
+    sleep 1
+fi
+
 log_info "Creating key pair: $KEY_NAME..."
 aws ec2 create-key-pair \
   --key-name $KEY_NAME \
@@ -210,10 +252,11 @@ log_success "Key pair created and saved to $KEY_FILE"
 
 log_step "Part 4: Launching EC2 Instances"
 
-# Get Ubuntu 24.04 AMI
-log_info "Finding Ubuntu 24.04 AMI..."
+# Get Ubuntu 22.04 AMI (free tier eligible, no marketplace subscription needed)
+log_info "Finding Ubuntu 22.04 AMI..."
 export AMI_ID=$(aws ec2 describe-images \
-  --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*" \
+  --owners 099720109477 \
+  --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
             "Name=state,Values=available" \
   --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
   --output text \
@@ -369,6 +412,18 @@ WORKER3_PRIVATE_IP=$WORKER3_PRIVATE_IP
 EOF
 
 log_success "Configuration saved to cluster-config.txt and cluster-ips.txt"
+
+# Create SSH helper script for master node
+log_info "Creating SSH helper script..."
+cat > ssh_to_master_node.sh <<EOF
+#!/bin/bash
+# SSH to Spark Master Node
+# Generated on $(date)
+ssh -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP
+EOF
+
+chmod +x ssh_to_master_node.sh
+log_success "SSH helper script created: ssh_to_master_node.sh"
 
 ################################################################################
 # Part 6: Copy Files to All Nodes
@@ -682,6 +737,9 @@ echo "=================================================="
 echo ""
 echo "SSH to Master:"
 echo "  ssh -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP"
+echo ""
+echo "Or use the helper script:"
+echo "  ./ssh_to_master_node.sh"
 echo ""
 echo "Spark Master Web UI:"
 echo "  http://$MASTER_PUBLIC_IP:8080"
