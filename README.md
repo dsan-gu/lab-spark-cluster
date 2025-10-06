@@ -50,6 +50,14 @@ Follow the detailed instructions in [SPARK_CLUSTER_SETUP.md](SPARK_CLUSTER_SETUP
 - Screenshots of:
   - Spark Master Web UI showing connected workers (placeholder - to be provided)
   - Spark Application UI showing a running job (placeholder - to be provided)
+- Download result files from master node to your EC2 instance:
+  ```bash
+  scp -i spark-cluster-key.pem ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/problem1_cluster.txt .
+  ```
+- Commit and push the following files:
+  - `cluster-config.txt`
+  - `cluster-ips.txt`
+  - `problem1_cluster.txt` (cluster run output)
 
 **Cleanup:** After completing Step 1, manually delete resources in this order:
 1. Terminate EC2 instances
@@ -81,6 +89,19 @@ This script automates everything from Step 1, including:
 - Software installation on all nodes
 - Spark configuration
 - Cluster startup
+
+**Deliverables:**
+- Download result files from master node to your EC2 instance:
+  ```bash
+  # Use the SSH key from the setup (check cluster-config.txt for KEY_FILE name)
+  source cluster-config.txt
+  scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/*.txt .
+  ```
+- Commit and push the following files:
+  - `cluster-config.txt`
+  - `cluster-ips.txt`
+  - `ssh_to_master_node.sh`
+  - Output files from running the NYC TLC job (downloaded from master node)
 
 **Cleanup:** Use the automated cleanup script:
 ```bash
