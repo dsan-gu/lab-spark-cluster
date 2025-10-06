@@ -209,7 +209,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
      df = spark.read.parquet("reddit_sample.parquet")
      ```
    - Test your analysis logic on the sample file
-   - Verify outputs are correct (3 CSV files with _local suffix)
+   - Verify outputs are correct (see Deliverables section below for exact file names)
 
 2. **Cluster Deployment:**
    - Once local version works, create `reddit_analysis_cluster.py`
@@ -268,7 +268,6 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 - Screenshots of:
   - Spark Web UI showing the job execution
   - Application UI showing the DAG (Directed Acyclic Graph)
-- Brief report with findings
 
 **Hints:**
 - Use `spark.read.parquet()` to load data
