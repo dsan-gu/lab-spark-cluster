@@ -118,12 +118,20 @@ Or manually delete resources as in Step 1.
 
 #### Setup
 
-1. **Create S3 bucket for your data:**
+1. **Download a sample file for local development:**
+```bash
+# Download one file to test locally first
+aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/comments_RC_2024-01.zst_9.parquet \
+  ~/reddit_sample.parquet \
+  --request-payer requester
+```
+
+2. **Create S3 bucket for your data (after local testing works):**
 ```bash
 aws s3 mb s3://your-netid-spark-reddit
 ```
 
-2. **Copy Reddit data from shared dataset:**
+3. **Copy full Reddit data from shared dataset (after local testing works):**
 ```bash
 aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
   s3://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/ \
@@ -143,20 +151,61 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 1. **Most Popular Subreddits:** Find the top 10 most active subreddits by comment count
 2. **Temporal Analysis:** Identify peak commenting hours (UTC) across all subreddits
 
+**Development Workflow:**
+
+1. **Local Development (Recommended Approach):**
+   - Download one sample file: `~/reddit_sample.parquet`
+   - Create `reddit_analysis_local.py` that works with local file
+   - Use local Spark session (similar to the lab exercises):
+     ```python
+     spark = SparkSession.builder \
+         .appName("Reddit_Local") \
+         .getOrCreate()
+
+     df = spark.read.parquet("~/reddit_sample.parquet")
+     ```
+   - Test your analysis logic on the sample file
+   - Verify outputs are correct
+
+2. **Cluster Deployment:**
+   - Once local version works, create `reddit_analysis_cluster.py`
+   - Modify the code to use cluster master URL (see [nyc_tlc_problem1_cluster.py](cluster-files/nyc_tlc_problem1_cluster.py) for reference):
+     - Change `.getOrCreate()` to `.master(master_url).getOrCreate()`
+     - Change file path from local to S3A: `s3a://your-netid-spark-reddit/...`
+     - Add S3A configuration (copy from NYC TLC example)
+     - Accept master URL from command line argument
+   - Copy full dataset to your S3 bucket
+   - Copy your script to the cluster master node:
+     ```bash
+     # Load cluster configuration
+     source cluster-config.txt
+
+     # Copy your cluster script to master node
+     scp -i $KEY_FILE reddit_analysis_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
+     ```
+   - SSH to master and run on your Spark cluster:
+     ```bash
+     ssh -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP
+     cd ~/spark-cluster
+     source cluster-ips.txt
+     uv run python reddit_analysis_cluster.py spark://$MASTER_PRIVATE_IP:7077
+     ```
+
 **Deliverables:**
-- PySpark script (`reddit_analysis.py`) that performs the analysis
-- Output files saved to your S3 bucket
+- `reddit_analysis_local.py` (local development version)
+- `reddit_analysis_cluster.py` (cluster version)
+- Output CSV files from cluster run
 - Screenshots of:
   - Spark Web UI showing the job execution
   - Application UI showing the DAG (Directed Acyclic Graph)
 - Brief report with findings
 
 **Hints:**
-- Use `spark.read.parquet()` to load data from S3
-- Configure AWS credentials in Spark configuration
-- Use DataFrame operations for efficient processing
-- Consider using `repartition()` for better parallelism
-- Save results using `df.write.csv()`
+- Use `spark.read.parquet()` to load data
+- Extract hour from `created_utc` using `hour(from_unixtime(col("created_utc")))`
+- Use `groupBy()` and `agg()` for aggregations
+- Use `orderBy(desc("count"))` for sorting
+- Save results using `.toPandas().to_csv()` or `df.write.csv()`
 
 **⚠️ WARNING: If you do not delete your cluster, you will exhaust the funds in your account. Always delete your cluster when done! Use [cleanup-spark-cluster.sh](cleanup-spark-cluster.sh) for automated cleanup.**
 
