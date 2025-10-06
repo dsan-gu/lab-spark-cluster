@@ -125,11 +125,11 @@ aws s3 mb s3://your-netid-spark-reddit
 
 2. **Copy Reddit data from shared dataset:**
 ```bash
-aws s3 sync s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
+aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
   s3://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/ \
+  --recursive \
   --request-payer requester \
-  --no-progress \
-  --no-copy-tags
+  --metadata-directive REPLACE
 ```
 
 #### Problem 3: Reddit Subreddit Analysis
