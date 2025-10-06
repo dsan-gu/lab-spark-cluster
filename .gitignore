@@ -41,13 +41,9 @@ aws/
 # Spark cluster setup files
 *.pem
 spark-cluster-key.pem
-cluster-ips.txt
-cluster-config.txt
 
 # Temporary and output files
 *.log
-*.txt
-*.csv
 *.parquet
 output/
 logs/
