@@ -30,7 +30,36 @@ By completing this lab, you will gain practical experience with:
 - AWS CLI configured with credentials
 - Your laptop's public IP address (get from https://ipchicken.com/)
 
+---
+
+## 🟢 IMPORTANT: Critical Skills for Your Project
+
+**This lab is probably the most important one for your project.** The skills you learn here - setting up a cluster, running code both locally and on a distributed cluster, cleaning up resources, viewing metrics in the Spark UI - are **critical** for using Spark in your final project.
+
+Make sure you are **very comfortable** with all these operations and can easily do them repeatedly. In fact, it might be a good idea to **repeat this lab once you have completed and submitted it** so that you become super conversant with:
+- Setting up a cluster from scratch
+- Running code in distributed mode
+- Monitoring jobs through the Spark Web UIs
+- Troubleshooting issues
+- Cleaning up resources properly
+
+The step-by-step guide in [SPARK_CLUSTER_SETUP.md](SPARK_CLUSTER_SETUP.md) gives you insight into what actually goes on when setting up a distributed cluster. All of these are **important foundational concepts** that apply to having multiple machines communicate and work together. While the implementation is AWS-specific, **these concepts are cloud-agnostic** and apply to all cloud providers (AWS, Azure, GCP, etc.).
+
+Understanding these fundamentals will make you proficient in distributed computing, regardless of which cloud platform you use in your career.
+
+---
+
 ## Three-Problem Learning Approach
+
+### But First... A Review of Last Week
+
+Before diving into the cluster setup, let's review last week's NYC TLC problem - but this time in a Jupyter notebook. Sometimes it's easier to work with and experiment with code in a notebook environment rather than running standalone Python scripts.
+
+**Task:** Run the NYC TLC Problem 1 analysis in a Jupyter notebook with Spark running locally.
+
+All code has been provided for you in [`cluster-files/nyc_tlc_problem1.ipynb`](cluster-files/nyc_tlc_problem1.ipynb). Just open the notebook and run all the cells to confirm that Spark works correctly on your EC2 instance.
+
+---
 
 ## Problem 1: Manual Cluster Setup (Learning the Fundamentals) - 20 Points
 
@@ -204,16 +233,25 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
      source cluster-ips.txt
      uv run python reddit_analysis_cluster.py spark://$MASTER_PRIVATE_IP:7077
      ```
+
+   **⏱️ IMPORTANT - Expected Runtime:**
+   This job processes ~280 million Reddit comments and is expected to take **10-15 minutes** to complete when running correctly on the cluster. This is normal! While the job is running:
+   - Monitor progress in the **Spark Master UI** at `http://$MASTER_PUBLIC_IP:8080` to see worker activity
+   - Watch the **Spark Application UI** at `http://$MASTER_PUBLIC_IP:4040` to see the job DAG, stages, and tasks
+   - You'll see three separate analyses run sequentially (dataset stats, top subreddits, peak hours)
+   - Each analysis will read the data from S3 and perform distributed computations across your worker nodes
+
+   Don't worry if it seems slow - you're processing hundreds of millions of records! Use the Web UIs to understand what Spark is doing behind the scenes.
+
    - Download results from cluster:
      ```bash
      # From your EC2 instance (not on the cluster)
      source cluster-config.txt
-     scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/*.csv .
 
-     # Rename cluster outputs to include _cluster suffix
-     mv dataset_stats.csv dataset_stats_cluster.csv
-     mv top_subreddits.csv top_subreddits_cluster.csv
-     mv peak_hours.csv peak_hours_cluster.csv
+     # Download the cluster output CSV files (already have _cluster suffix)
+     scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/dataset_stats_cluster.csv .
+     scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/top_subreddits_cluster.csv .
+     scp -i $KEY_FILE ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/peak_hours_cluster.csv .
      ```
 
 **Deliverables:**
@@ -239,6 +277,14 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 - Use `groupBy()` and `agg()` for aggregations
 - Use `orderBy(desc("count"))` for sorting
 - Save results using `.toPandas().to_csv()` or `df.write.csv()`
+
+**Expected Warning (Normal Behavior):**
+When reading parquet files from S3, you may see a `FileNotFoundException` warning about streaming metadata:
+```
+WARN FileStreamSink: Assume no metadata directory. Error while looking for metadata directory in the path: s3a://...
+java.io.FileNotFoundException: No such file or directory: s3a://your-netid-spark-reddit/...
+```
+This is **normal and harmless**. Spark checks if the path contains streaming metadata (used for Spark Structured Streaming), and when it doesn't find any, it proceeds to read the files as regular batch data. Your job will continue successfully despite this warning.
 
 **⚠️ WARNING: If you do not delete your cluster, you will exhaust the funds in your account. Always delete your cluster when done! Use [cleanup-spark-cluster.sh](cleanup-spark-cluster.sh) for automated cleanup.**
 

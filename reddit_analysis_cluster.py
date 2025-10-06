@@ -117,7 +117,7 @@ def analyze_dataset_stats(spark, data_path):
     print(f"⏱️  Execution time: {execution_time:.2f} seconds")
 
     # Save to CSV
-    output_file = "dataset_stats.csv"
+    output_file = "dataset_stats_cluster.csv"
     logger.info(f"Saving results to {output_file}")
     print(f"\n✅ Saving results to {output_file}")
 
@@ -190,7 +190,7 @@ def analyze_popular_subreddits(spark, data_path):
     subreddit_counts.show(10, truncate=False)
 
     # Save to CSV
-    output_file = "top_subreddits.csv"
+    output_file = "top_subreddits_cluster.csv"
     logger.info(f"Saving results to {output_file}")
     print(f"\n✅ Saving results to {output_file}")
 
@@ -280,7 +280,7 @@ def analyze_peak_hours(spark, data_path):
     peak_count = peak_hour_data['comment_count']
 
     # Save to CSV
-    output_file = "peak_hours.csv"
+    output_file = "peak_hours_cluster.csv"
     logger.info(f"Saving results to {output_file}")
     print(f"\n✅ Saving results to {output_file}")
 
@@ -340,11 +340,13 @@ def main():
     spark = create_spark_session(master_url)
 
     # S3 path to Reddit data
-    # Students should update this to their own bucket
-    data_path = "s3a://aa1603-reddit/reddit/comments/yyyy=2024/mm=01/*.parquet"
+    # Students should update this to their own bucket: {netid}-spark-reddit
+    # Example: If your NetID is aa1234, your bucket should be aa1234-spark-reddit
+    data_path = "s3a://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/*.parquet"
 
     print(f"\n📁 Data source: {data_path}")
     print("⚠️  Note: Update 'your-netid' in the script to match your S3 bucket name")
+    print("⚠️  Bucket naming format: {netid}-spark-reddit (e.g., aa1234-spark-reddit)")
     print("⚠️  Make sure you copied data from s3://dsan6000-datasets with --request-payer requester")
     logger.info(f"Using data path: {data_path}")
 
@@ -384,9 +386,9 @@ def main():
         print("✅ PROBLEM 3 COMPLETED SUCCESSFULLY!")
         print(f"\nTotal execution time: {total_time:.2f} seconds")
         print("\nFiles created:")
-        print("  - dataset_stats.csv (Unique comments and users)")
-        print("  - top_subreddits.csv (Top 10 most popular subreddits)")
-        print("  - peak_hours.csv (Hourly comment distribution)")
+        print("  - dataset_stats_cluster.csv (Unique comments and users)")
+        print("  - top_subreddits_cluster.csv (Top 10 most popular subreddits)")
+        print("  - peak_hours_cluster.csv (Hourly comment distribution)")
         print("\nNext steps:")
         print("  1. Download the CSV files from the master node:")
         print("     scp -i <key>.pem ubuntu@<master-ip>:~/spark-cluster/*.csv .")

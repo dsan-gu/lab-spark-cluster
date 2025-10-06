@@ -321,9 +321,9 @@ def main():
         print("  2. Once confirmed working, create the cluster version:")
         print("     - Copy this script to reddit_analysis_cluster.py")
         print("     - Add cluster configuration (see nyc_tlc_problem1_cluster.py)")
-        print("     - Change data path to S3A: s3a://your-netid-spark-reddit/...")
+        print("     - Change data path to S3A: s3a://{netid}-spark-reddit/...")
         print("     - Add command line argument for master URL")
-        print("  3. Copy full dataset to S3 and run on cluster")
+        print("  3. Copy full dataset to S3 bucket named {netid}-spark-reddit and run on cluster")
     else:
         print("❌ Problem 3 failed - check error messages above")
     print("=" * 70)

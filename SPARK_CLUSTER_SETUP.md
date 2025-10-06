@@ -1144,12 +1144,13 @@ The previous step ran in local mode (all processing on one node). To run in **cl
 
 **Why read from S3?** In cluster mode, tasks are distributed across multiple nodes. If data files are stored locally on only one node, worker nodes can't access them. Reading directly from S3 allows all nodes to access the same data.
 
-First, copy the cluster version script from your EC2 instance:
+First, copy the cluster version script and cluster-ips.txt from your EC2 instance:
 
 ```bash
 # From your EC2 instance (where you have cluster-files/)
-source cluster-ips.txt
+source cluster-config.txt
 scp -i spark-cluster-key.pem cluster-files/nyc_tlc_problem1_cluster.py ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
+scp -i spark-cluster-key.pem cluster-ips.txt ubuntu@$MASTER_PUBLIC_IP:~/spark-cluster/
 ```
 
 Then on the master node, run the cluster version:
