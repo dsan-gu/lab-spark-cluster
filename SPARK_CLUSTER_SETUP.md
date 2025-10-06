@@ -1219,46 +1219,7 @@ tail -f $SPARK_HOME/logs/spark-*-worker-*.out
 
 ---
 
-## Part 13: Running Lab Assignments on the Cluster
-
-### Modifying Scripts for Cluster Execution
-
-To run the lab scripts on your cluster, you need to modify the SparkSession creation to use the cluster master URL.
-
-**Original (local mode):**
-```python
-spark = SparkSession.builder \
-    .appName("NYC TLC Analysis") \
-    .getOrCreate()
-```
-
-**Modified (cluster mode):**
-```python
-spark = SparkSession.builder \
-    .appName("NYC TLC Analysis") \
-    .master("spark://[MASTER_PRIVATE_IP]:7077") \
-    .config("spark.executor.memory", "4g") \
-    .config("spark.executor.cores", "2") \
-    .getOrCreate()
-```
-
-Replace `[MASTER_PRIVATE_IP]` with your actual master private IP.
-
-### Running with spark-submit
-
-Alternatively, use spark-submit without modifying the code:
-```bash
-spark-submit \
-  --master spark://[MASTER_PRIVATE_IP]:7077 \
-  --executor-memory 4g \
-  --executor-cores 2 \
-  --total-executor-cores 4 \
-  nyc_tlc_problem1.py
-```
-
----
-
-## Part 14: Cleanup (When Done)
+## Part 13: Cleanup (When Done)
 
 ### Load Cluster Configuration
 
@@ -1297,41 +1258,6 @@ aws ec2 terminate-instances \
   --instance-ids $MASTER_INSTANCE_ID $WORKER1_INSTANCE_ID $WORKER2_INSTANCE_ID \
   --region $AWS_REGION
 ```
-
-**Option 2: Find by tags (if you don't have cluster-config.txt)**
-
-Check which instances will be terminated:
-```bash
-aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=spark-master,spark-worker" "Name=instance-state-name,Values=running" \
-  --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' \
-  --output table \
-  --region $AWS_REGION
-```
-
-You should see your 3 instances (1 master + 2 workers) in "running" state.
-
-Terminate them:
-```bash
-aws ec2 terminate-instances \
-  --instance-ids $(aws ec2 describe-instances \
-    --filters "Name=tag:Name,Values=spark-master,spark-worker" "Name=instance-state-name,Values=running" \
-    --query 'Reservations[*].Instances[*].InstanceId' \
-    --output text \
-    --region $AWS_REGION) \
-  --region $AWS_REGION
-```
-
-**Verify termination started:**
-```bash
-aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=spark-master,spark-worker" \
-  --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' \
-  --output table \
-  --region $AWS_REGION
-```
-
-You should now see instances in "shutting-down" or "terminated" state.
 
 ### Delete Security Group
 
