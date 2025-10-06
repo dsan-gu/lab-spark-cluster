@@ -162,8 +162,9 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 
 **Task:** Analyze the Reddit comments data to answer the following questions:
 
-1. **Most Popular Subreddits:** Find the top 10 most active subreddits by comment count
-2. **Temporal Analysis:** Identify peak commenting hours (UTC) across all subreddits
+1. **Dataset Statistics:** Count the total number of unique comments and unique users (authors) in the dataset
+2. **Most Popular Subreddits:** Find the top 10 most active subreddits by comment count
+3. **Temporal Analysis:** Identify peak commenting hours (UTC) across all subreddits
 
 **Development Workflow:**
 
@@ -216,6 +217,7 @@ aws s3 cp s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
 
 **Hints:**
 - Use `spark.read.parquet()` to load data
+- Count unique values using `df.select("column").distinct().count()` or `countDistinct("column")`
 - Extract hour from `created_utc` using `hour(from_unixtime(col("created_utc")))`
 - Use `groupBy()` and `agg()` for aggregations
 - Use `orderBy(desc("count"))` for sorting

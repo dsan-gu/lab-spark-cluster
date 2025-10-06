@@ -47,6 +47,72 @@ def create_spark_session():
     return spark
 
 
+def analyze_dataset_stats(spark, data_path):
+    """
+    Analyze dataset statistics: count unique comments and unique users.
+
+    Args:
+        spark: SparkSession object
+        data_path: Path to Reddit parquet file
+
+    Returns:
+        Dictionary with statistics
+    """
+
+    print("\n" + "=" * 70)
+    print("ANALYSIS 1: Dataset Statistics")
+    print("=" * 70)
+
+    start_time = time.time()
+
+    # Read Reddit comments
+    print(f"\nReading Reddit comments from: {data_path}")
+    reddit_df = spark.read.parquet(data_path)
+
+    # Count total comments
+    print("\nCounting total comments...")
+    total_comments = reddit_df.count()
+    print(f"✅ Total comments: {total_comments:,}")
+
+    # Count unique comments (assuming 'id' column for comment ID)
+    print("Counting unique comments...")
+    unique_comments = reddit_df.select("id").distinct().count()
+    print(f"✅ Unique comments: {unique_comments:,}")
+
+    # Count unique users (authors)
+    print("Counting unique users...")
+    unique_users = reddit_df.select("author").distinct().count()
+    print(f"✅ Unique users (authors): {unique_users:,}")
+
+    # Calculate execution time
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"⏱️  Execution time: {execution_time:.2f} seconds")
+
+    # Save to CSV
+    output_file = "dataset_stats_local.csv"
+    print(f"\n✅ Saving results to {output_file}")
+
+    import pandas as pd
+    stats_df = pd.DataFrame({
+        'metric': ['total_comments', 'unique_comments', 'unique_users'],
+        'count': [total_comments, unique_comments, unique_users]
+    })
+    stats_df.to_csv(output_file, index=False)
+
+    # Print summary
+    print("\n" + "=" * 70)
+    print("ANALYSIS 1 SUMMARY")
+    print("=" * 70)
+    print(f"Total comments: {total_comments:,}")
+    print(f"Unique comments: {unique_comments:,}")
+    print(f"Unique users: {unique_users:,}")
+    print(f"Results saved to: {output_file}")
+    print("=" * 70)
+
+    return {'total': total_comments, 'unique_comments': unique_comments, 'unique_users': unique_users}
+
+
 def analyze_popular_subreddits(spark, data_path):
     """
     Analyze Reddit data to find top 10 most popular subreddits by comment count.
@@ -60,7 +126,7 @@ def analyze_popular_subreddits(spark, data_path):
     """
 
     print("\n" + "=" * 70)
-    print("ANALYSIS 1: Top 10 Most Popular Subreddits")
+    print("ANALYSIS 2: Top 10 Most Popular Subreddits")
     print("=" * 70)
 
     start_time = time.time()
@@ -102,7 +168,7 @@ def analyze_popular_subreddits(spark, data_path):
 
     # Print summary
     print("\n" + "=" * 70)
-    print("ANALYSIS 1 SUMMARY")
+    print("ANALYSIS 2 SUMMARY")
     print("=" * 70)
     print(f"Total comments analyzed: {total_comments:,}")
     print(f"Total unique subreddits: {reddit_df.select('subreddit').distinct().count():,}")
@@ -126,7 +192,7 @@ def analyze_peak_hours(spark, data_path):
     """
 
     print("\n" + "=" * 70)
-    print("ANALYSIS 2: Peak Commenting Hours (UTC)")
+    print("ANALYSIS 3: Peak Commenting Hours (UTC)")
     print("=" * 70)
 
     start_time = time.time()
@@ -182,7 +248,7 @@ def analyze_peak_hours(spark, data_path):
 
     # Print summary
     print("\n" + "=" * 70)
-    print("ANALYSIS 2 SUMMARY")
+    print("ANALYSIS 3 SUMMARY")
     print("=" * 70)
     print(f"Total comments analyzed: {total_comments:,}")
     print(f"Peak hour: {peak_hour}:00 UTC ({peak_count:,} comments)")
@@ -220,10 +286,13 @@ def main():
     # Run analyses
     success = True
     try:
-        # Analysis 1: Top 10 Subreddits
+        # Analysis 1: Dataset Statistics
+        stats_results = analyze_dataset_stats(spark, data_path)
+
+        # Analysis 2: Top 10 Subreddits
         subreddit_results = analyze_popular_subreddits(spark, data_path)
 
-        # Analysis 2: Peak Hours
+        # Analysis 3: Peak Hours
         hourly_results = analyze_peak_hours(spark, data_path)
 
         print("\n✅ All analyses completed successfully!")
@@ -244,6 +313,7 @@ def main():
         print("✅ PROBLEM 3 LOCAL VERSION COMPLETED SUCCESSFULLY!")
         print(f"\nTotal execution time: {total_time:.2f} seconds")
         print("\nFiles created:")
+        print("  - dataset_stats_local.csv (Unique comments and users)")
         print("  - top_subreddits_local.csv (Top 10 most popular subreddits)")
         print("  - peak_hours_local.csv (Hourly comment distribution)")
         print("\nNext steps:")
