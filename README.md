@@ -128,7 +128,8 @@ aws s3 mb s3://your-netid-spark-reddit
 aws s3 sync s3://dsan6000-datasets/reddit/parquet/comments/yyyy=2024/mm=01/ \
   s3://your-netid-spark-reddit/reddit/comments/yyyy=2024/mm=01/ \
   --request-payer requester \
-  --no-progress
+  --no-progress \
+  --no-copy-tags
 ```
 
 #### Problem 3: Reddit Subreddit Analysis
