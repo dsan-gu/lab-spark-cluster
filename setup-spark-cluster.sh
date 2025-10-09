@@ -440,7 +440,7 @@ copy_files_to_node() {
 
     log_info "Copying files to $NODE_NAME ($NODE_IP)..."
     ssh $SSH_OPTS ubuntu@$NODE_IP "mkdir -p ~/spark-cluster" 2>/dev/null
-    scp $SSH_OPTS cluster-files/* ubuntu@$NODE_IP:~/spark-cluster/ 2>/dev/null
+    scp -r $SSH_OPTS cluster-files/* ubuntu@$NODE_IP:~/spark-cluster/ 2>/dev/null
     scp $SSH_OPTS cluster-ips.txt ubuntu@$NODE_IP:~/spark-cluster/ 2>/dev/null
     log_success "Files copied to $NODE_NAME"
 }
